@@ -19,8 +19,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class ObjectCache {
 
-    private Storage<?> holder;
-    @Getter
+    private final Storage<?> holder;
     private LoadingCache<Object, DataObject> objectCache;
 
     public ObjectCache(Storage<?> holder, long amount, TimeUnit unit) {
@@ -53,4 +52,7 @@ public class ObjectCache {
         };
     }
 
+    public LoadingCache<Object, DataObject> getObjectCache() {
+        return objectCache;
+    }
 }
