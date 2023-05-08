@@ -108,7 +108,8 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
 
     public void setCacheSaveTime(long seconds) {
         cacheTimeInSecondsToSave = seconds;
-        cacheSaveTask.setOrResetInterval(cacheTimeInSecondsToSave);
+        if (cacheSaveTask != null)
+            cacheSaveTask.setOrResetInterval(cacheTimeInSecondsToSave);
     }
 
 

@@ -2,7 +2,6 @@ package io.aquaticlabs.aquaticdata.data.storage;
 
 import io.aquaticlabs.aquaticdata.data.cache.ModelCachedData;
 import io.aquaticlabs.aquaticdata.data.object.DataObject;
-import io.aquaticlabs.aquaticdata.data.tasks.TaskFactory;
 import io.aquaticlabs.aquaticdata.util.ConstuctorFailThrowable;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -71,6 +70,7 @@ public abstract class Storage<T extends DataObject> implements Iterable<T> {
         Constructor<T> constructor;
         try {
             constructor = type.getDeclaredConstructor();
+            constructor.setAccessible(true);
         } catch (NoSuchMethodException e) {
             throw new ConstuctorFailThrowable("Please ensure that the type '" + type.getSimpleName() + "' has a single-arg constructor.");
         }
