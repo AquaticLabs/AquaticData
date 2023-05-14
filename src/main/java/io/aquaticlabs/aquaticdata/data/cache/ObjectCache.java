@@ -20,30 +20,27 @@ public class ObjectCache<V extends DataObject> {
 
     private final Storage<V> holder;
 
-    private final Cache<Integer, V> cache;
-    private final AtomicInteger counter;
+    private final Cache<Object, V> dataCache;
 
     public ObjectCache(Storage<V> holder, long duration, TimeUnit unit) {
         this.holder = holder;
 
-        cache = CacheBuilder.newBuilder()
-                .maximumSize(500)
+        dataCache = CacheBuilder.newBuilder()
+                .maximumSize(800)
                 .expireAfterWrite(duration, unit)
                 .removalListener(defaultRemovalListener())
                 .build();
-        counter = new AtomicInteger();
     }
 
     public void put(V value) {
-        int key = counter.getAndIncrement();
-        cache.put(key, value);
+        dataCache.put(value.getKey(), value);
     }
 
     public int size() {
-        return (int)cache.size();
+        return (int) dataCache.size();
     }
 
-    private RemovalListener<Integer, V> defaultRemovalListener() {
+    private RemovalListener<Object, V> defaultRemovalListener() {
         return notification -> {
             DataDebugLog.logDebug("Going to remove data from InputDataPool");
             if (notification.getCause() == RemovalCause.EXPIRED) {
@@ -53,5 +50,9 @@ public class ObjectCache<V extends DataObject> {
                 DataDebugLog.logDebug("This data was manually removed: " + notification.getKey());
             }
         };
+    }
+
+    public Cache<Object, V> getDataCache() {
+        return dataCache;
     }
 }

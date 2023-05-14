@@ -50,7 +50,7 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
     private final TaskFactory taskFactory = TaskFactory.getOrNew("StorageHolder<T> Factory");
 
     @Getter
-    private ObjectCache cache;
+    private ObjectCache<T> cache;
     @Getter
     @Setter
     protected CacheMode cacheMode = CacheMode.TIME;
@@ -147,7 +147,7 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
     @Override
     public void invalidateCacheEntryIfMode(T object) {
         if (storageMode == StorageMode.LOAD_AND_TIMEOUT) {
-            cache.getObjectCache().invalidate(object);
+            cache.getDataCache().invalidate(object);
         }
     }
 
@@ -155,7 +155,7 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
     protected void addToCache(T object) {
         switch (storageMode) {
             case LOAD_AND_TIMEOUT:
-                cache.getObjectCache().put(object.getKey(), object);
+                cache.put(object);
                 break;
             case LOAD_AND_STORE:
                 break;
@@ -167,7 +167,7 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
     @Override
     protected void cleanCache() {
         if (storageMode == StorageMode.LOAD_AND_TIMEOUT) {
-            getCache().getObjectCache().cleanUp();
+            cache.getDataCache().cleanUp();
         }
     }
 
@@ -273,7 +273,7 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
 
     public T load(DataEntry<String, ?> key, boolean async, boolean persistent) {
         if (getStorageMode() == StorageMode.LOAD_AND_TIMEOUT) {
-            getCache().getObjectCache().cleanUp();
+            cache.getDataCache().cleanUp();
         }
         Consumer<Runnable> runner = AquaticDatabase.getInstance().getRunner(async);
 
