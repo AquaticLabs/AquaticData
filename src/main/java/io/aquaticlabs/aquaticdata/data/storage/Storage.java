@@ -61,10 +61,7 @@ public abstract class Storage<T extends DataObject> implements Iterable<T> {
 
     public abstract void invalidateCacheEntryIfMode(T object);
 
-    public abstract void removeDataObj(DataObject key);
-
     protected abstract void cleanCache();
-
 
     protected Constructor<T> constructorOf(Class<T> type) throws ConstuctorFailThrowable {
         Constructor<T> constructor;

@@ -1,58 +1,57 @@
 package io.aquaticlabs.aquaticdata.data.cache;
 
+import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
 import com.google.common.cache.RemovalCause;
 import com.google.common.cache.RemovalListener;
 import io.aquaticlabs.aquaticdata.data.object.DataObject;
 import io.aquaticlabs.aquaticdata.data.storage.Storage;
 import io.aquaticlabs.aquaticdata.util.DataDebugLog;
-import lombok.Getter;
 
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * @Author: extremesnow
  * On: 8/25/2022
  * At: 19:07
  */
-public class ObjectCache {
+public class ObjectCache<V extends DataObject> {
 
-    private final Storage<?> holder;
-    private LoadingCache<Object, DataObject> objectCache;
+    private final Storage<V> holder;
 
-    public ObjectCache(Storage<?> holder, long amount, TimeUnit unit) {
+    private final Cache<Integer, V> cache;
+    private final AtomicInteger counter;
+
+    public ObjectCache(Storage<V> holder, long duration, TimeUnit unit) {
         this.holder = holder;
 
-        CacheLoader<Object, DataObject> cache = new CacheLoader<Object, DataObject>() {
-            @Override
-            public DataObject load(Object key) {
-                return null;
-            }
-        };
-        objectCache = CacheBuilder.newBuilder()
+        cache = CacheBuilder.newBuilder()
                 .maximumSize(500)
-                .expireAfterWrite(amount, unit)
+                .expireAfterWrite(duration, unit)
                 .removalListener(defaultRemovalListener())
-                .build(cache);
-
+                .build();
+        counter = new AtomicInteger();
     }
 
+    public void put(V value) {
+        int key = counter.getAndIncrement();
+        cache.put(key, value);
+    }
 
-    private RemovalListener<Object, DataObject> defaultRemovalListener() {
+    public int size() {
+        return (int)cache.size();
+    }
+
+    private RemovalListener<Integer, V> defaultRemovalListener() {
         return notification -> {
             DataDebugLog.logDebug("Going to remove data from InputDataPool");
             if (notification.getCause() == RemovalCause.EXPIRED) {
                 DataDebugLog.logDebug("This data expired: " + notification.getKey());
-                holder.removeDataObj(notification.getValue());
+                holder.remove(notification.getValue());
             } else {
                 DataDebugLog.logDebug("This data was manually removed: " + notification.getKey());
             }
         };
-    }
-
-    public LoadingCache<Object, DataObject> getObjectCache() {
-        return objectCache;
     }
 }

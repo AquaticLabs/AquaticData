@@ -96,6 +96,7 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
         DataDebugLog.logDebug("Confirm Table: " + (endTime - startTime) + "ms");
     }
 
+
     protected void initStorageMode(StorageMode storageMode) {
         this.storageMode = storageMode;
         if (storageMode == StorageMode.LOAD_AND_TIMEOUT) {
@@ -130,6 +131,7 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
             }, getCacheTimeInSecondsToSave());
         }
     }
+
 
     public void shutdown() {
         cacheSaveTask.cancel();
