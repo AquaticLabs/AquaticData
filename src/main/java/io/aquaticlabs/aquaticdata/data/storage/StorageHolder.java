@@ -100,7 +100,7 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
     protected void initStorageMode(StorageMode storageMode) {
         this.storageMode = storageMode;
         if (storageMode == StorageMode.LOAD_AND_TIMEOUT) {
-            cache = new ObjectCache(this, timeOutTime, TimeUnit.MINUTES);
+            cache = new ObjectCache<T>(this, timeOutTime, TimeUnit.MINUTES);
         }
         if (storageMode == StorageMode.LOAD_AND_STORE) {
 
@@ -134,7 +134,9 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
 
 
     public void shutdown() {
-        cacheSaveTask.cancel();
+        if (cacheSaveTask != null) {
+            cacheSaveTask.cancel();
+        }
         if (cacheMode == CacheMode.SHUTDOWN) {
             // I probably should just do this anyway? shouldn't be a specific feature?
             //saveLoaded(false, () -> DataDebugLog.logDebug("Saved Loaded on Shutdown."));

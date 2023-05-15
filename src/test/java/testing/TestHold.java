@@ -22,7 +22,6 @@ public class TestHold extends StorageHolder<TestData> {
     @Getter
     private Map<UUID, TestData> data = new ConcurrentHashMap<>();
 
-
     public TestHold(DataCredential dataCredential) {
         super(dataCredential, TestData.class, StorageMode.LOAD_AND_STORE, CacheMode.TIME);
         setCacheSaveTime(10L);
@@ -53,11 +52,6 @@ public class TestHold extends StorageHolder<TestData> {
     @Override
     protected void onRemove(TestData object) {
         data.remove(object.uuid, object);
-    }
-
-    @Override
-    public void removeDataObj(DataObject key) {
-        remove(data.get(key.getKey()));
     }
 
     @Override
