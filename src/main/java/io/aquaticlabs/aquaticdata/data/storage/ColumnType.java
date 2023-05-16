@@ -40,7 +40,7 @@ public enum ColumnType {
     }
 
     public boolean needsQuotes() {
-        return this.equals(VARCHAR) || this.equals(VARCHAR_UUID) || this.equals(VARCHAR_64) || this.equals(TEXT);
+        return isVarchar();
     }
 
     public boolean isInt() {

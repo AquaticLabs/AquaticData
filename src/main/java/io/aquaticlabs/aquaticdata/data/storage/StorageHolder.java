@@ -44,13 +44,13 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
     private Class<T> clazz;
     @Getter
     @Setter
-    private StorageMode storageMode = StorageMode.LOAD_AND_TIMEOUT;
+    private StorageMode storageMode = StorageMode.LOAD_AND_STORE;
 
     @Getter
-    private final TaskFactory taskFactory = TaskFactory.getOrNew("StorageHolder<T> Factory");
+    private TaskFactory taskFactory;
 
     @Getter
-    private ObjectCache<T> cache;
+    private ObjectCache<T> temporaryDataCache;
     @Getter
     @Setter
     protected CacheMode cacheMode = CacheMode.TIME;
@@ -80,9 +80,11 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
             return;
         }
 
-
         this.database = dataCredential.build(t);
         this.clazz = clazz;
+
+        this.taskFactory = TaskFactory.getOrNew("StorageHolder<T>(" + clazz.getName() + ") Factory");
+
         addVariant(this.database.getTable(), clazz);
         initStorageMode(storageMode);
 
@@ -100,7 +102,7 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
     protected void initStorageMode(StorageMode storageMode) {
         this.storageMode = storageMode;
         if (storageMode == StorageMode.LOAD_AND_TIMEOUT) {
-            cache = new ObjectCache<T>(this, timeOutTime, TimeUnit.MINUTES);
+            temporaryDataCache = new ObjectCache<>(this, timeOutTime, TimeUnit.MINUTES);
         }
         if (storageMode == StorageMode.LOAD_AND_STORE) {
 
@@ -149,7 +151,7 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
     @Override
     public void invalidateCacheEntryIfMode(T object) {
         if (storageMode == StorageMode.LOAD_AND_TIMEOUT) {
-            cache.getDataCache().invalidate(object);
+            temporaryDataCache.getDataCache().invalidate(object);
         }
     }
 
@@ -157,7 +159,7 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
     protected void addToCache(T object) {
         switch (storageMode) {
             case LOAD_AND_TIMEOUT:
-                cache.put(object);
+                temporaryDataCache.put(object);
                 break;
             case LOAD_AND_STORE:
                 break;
@@ -169,7 +171,7 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
     @Override
     protected void cleanCache() {
         if (storageMode == StorageMode.LOAD_AND_TIMEOUT) {
-            cache.getDataCache().cleanUp();
+            temporaryDataCache.getDataCache().cleanUp();
         }
     }
 
@@ -275,7 +277,7 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
 
     public T load(DataEntry<String, ?> key, boolean async, boolean persistent) {
         if (getStorageMode() == StorageMode.LOAD_AND_TIMEOUT) {
-            cache.getDataCache().cleanUp();
+            temporaryDataCache.getDataCache().cleanUp();
         }
         Consumer<Runnable> runner = AquaticDatabase.getInstance().getRunner(async);
 
@@ -418,18 +420,25 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
 
         List<DataEntry<String, String>> needsUpdate = new ArrayList<>();
         for (DataEntry<String, String> entryList : data.toColumnList(object.getStructure())) {
-            String column = entryList.getKey();
+            String columnName = entryList.getKey();
             String value = entryList.getValue();
 
-            if (!data.getValue(entryList.getKey()).isPresent()) {
-                needsUpdate.add(new DataEntry<>(column, value));
-                DataDebugLog.logDebug("Needs Update: " + column + " " + value);
+            if (!data.getValue(columnName).isPresent()) {
+                needsUpdate.add(new DataEntry<>(columnName, value));
+                DataDebugLog.logDebug("Needs Update: " + columnName + " " + value);
                 continue;
             }
 
-            if (!cache.isOutdated(column, value)) continue;
-            DataDebugLog.logDebug("Needs Update: " + column + " " + value);
-            needsUpdate.add(new DataEntry<>(column, value));
+            DataDebugLog.logDebug("Cache Details: " + columnName + " Cache Value Hash: " + cache.getCache().get(columnName) + " New Value Hash: " + cache.hashString(value));
+
+
+            if (!cache.isOutdated(columnName, value)) {
+                DataDebugLog.logDebug("Cache Is Up to date: " + columnName + " " + value);
+                continue;
+            }
+
+            DataDebugLog.logDebug("Cache Is Outdated... Needs Update: " + columnName + " Value: " + value);
+            needsUpdate.add(new DataEntry<>(columnName, value));
         }
         if (needsUpdate.isEmpty()) {
             return needsUpdate;
@@ -577,40 +586,6 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
             } catch (Exception e) {
                 throw new IllegalStateException("Failed to confirm table, strange Column Types/Names.", e);
             }
-
-
-
-/*
-            try (PreparedStatement preparedStatement = conn.prepareStatement("SELECT * FROM " + database.getTable() + ";")) {
-                try (ResultSet resultSet = preparedStatement.executeQuery()) {
-                    int cols = resultSet.getMetaData().getColumnCount();
-
-                    if (cols != object.getStructure().size()) {
-                        needsChange.put(1, "dummy");
-                    }
-
-                    for (int curCol = 1; curCol < cols; curCol++) {
-
-
-                        ColumnType colType = ColumnType.matchType(resultSet.getMetaData().getColumnTypeName(curCol));
-                        String colName = resultSet.getMetaData().getColumnTypeName(curCol);
-
-                        DataDebugLog.logDebug(colName);
-
-                        if (colType == null) {
-                            needsChange.put(curCol, resultSet.getMetaData().getColumnName(curCol));
-                            continue;
-                        }
-
-                        if (!ColumnType.isSimilarMatching(object.getStructure().get(curCol - 1).getValue(), colType)) {
-                            needsChange.put(curCol, resultSet.getMetaData().getColumnName(curCol));
-                        }
-                    }
-                }
-            } catch (Exception e) {
-                throw new IllegalStateException("Failed to get Database Size", e);
-            }
-*/
 
             DataDebugLog.logDebug(needsChange);
 
