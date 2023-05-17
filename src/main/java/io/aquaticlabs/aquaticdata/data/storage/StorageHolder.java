@@ -83,7 +83,8 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
         this.database = dataCredential.build(t);
         this.clazz = clazz;
 
-        this.taskFactory = TaskFactory.getOrNew("StorageHolder<T>(" + clazz.getName() + ") Factory");
+        String splitName = clazz.getName().split("\\.")[clazz.getName().split("\\.").length - 1];
+        this.taskFactory = TaskFactory.getOrNew("StorageHolder<T>(" + splitName + ") Factory");
 
         addVariant(this.database.getTable(), clazz);
         initStorageMode(storageMode);
@@ -429,15 +430,15 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
                 continue;
             }
 
-            DataDebugLog.logDebug("Cache Details: " + columnName + " Cache Value Hash: " + cache.getCache().get(columnName) + " New Value Hash: " + cache.hashString(value));
+           // DataDebugLog.logDebug("Cache Details: " + columnName + " Cache Value Hash: " + cache.getCache().get(columnName) + " New Value Hash: " + cache.hashString(value));
 
 
             if (!cache.isOutdated(columnName, value)) {
-                DataDebugLog.logDebug("Cache Is Up to date: " + columnName + " " + value);
+               // DataDebugLog.logDebug("Cache Is Up to date: " + columnName + " " + value);
                 continue;
             }
 
-            DataDebugLog.logDebug("Cache Is Outdated... Needs Update: " + columnName + " Value: " + value);
+           // DataDebugLog.logDebug("Cache Is Outdated... Needs Update: " + columnName + " Value: " + value);
             needsUpdate.add(new DataEntry<>(columnName, value));
         }
         if (needsUpdate.isEmpty()) {

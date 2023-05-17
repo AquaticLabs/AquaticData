@@ -5,6 +5,7 @@ import lombok.Getter;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executors;
@@ -112,7 +113,10 @@ public class TaskFactory {
      * Any scheduled tasks will be cancelled and any active tasks will be allowed to complete.
      */
     public void shutdown() {
-        scheduledExecutorService.shutdown();
+
+        List<Runnable> canceledTasks = scheduledExecutorService.shutdownNow();
+        DataDebugLog.logDebug("Task Factory " + ownerID + " has shut down, " + canceledTasks.size() + " tasks were forcefully stopped and not completed.");
+
     }
 
 

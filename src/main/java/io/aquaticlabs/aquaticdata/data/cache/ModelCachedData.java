@@ -39,7 +39,6 @@ public class ModelCachedData {
   public int hashString(String data) {
     int hash = 0;
     for (char c : data.toCharArray()) hash += Character.hashCode(c);
-
     return hash;
   }
 }

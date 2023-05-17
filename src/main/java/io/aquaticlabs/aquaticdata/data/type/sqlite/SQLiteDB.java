@@ -77,6 +77,7 @@ public class SQLiteDB extends HikariCPDatabase {
             } else first = false;
 
             if (col.get(i).getValue().needsQuotes()) {
+                //DataDebugLog.logDebug("INSERT STATEMENT: Value is Varchar, Attempting wrap in ' key: " + column.getKey());
                 builder.append("'").append(column.getValue().replace("'", "")).append("'");
                 i++;
                 continue;
@@ -107,13 +108,17 @@ public class SQLiteDB extends HikariCPDatabase {
                 .append(" SET ");
 
         for (int i = 1; i < columns.size(); i++) {
-            DataEntry<String, String> column = columns.get(i);
-            builder.append(column.getKey())
-                    .append(" = ");
-            if (structure.get(i).getValue().isVarchar()) {
-                builder.append("'").append(column.getValue().replace("'", "")).append("'");
+            DataEntry<String, String> updatedData = columns.get(i);
+            ColumnType columnType = structure.stream().filter(entry -> entry.getKey().equalsIgnoreCase(updatedData.getKey())).map(DataEntry::getValue).findFirst().orElse(null);
+            if (columnType == null) continue;
+
+            builder.append(updatedData.getKey()).append(" = ");
+
+            if (columnType.needsQuotes()) {
+                DataDebugLog.logDebug("UPDATE STATEMENT: Value is Varchar, Attempting wrap in ' key: " + updatedData.getKey());
+                builder.append("'").append(updatedData.getValue().replace("'", "")).append("'");
             } else {
-                builder.append(column.getValue());
+                builder.append(updatedData.getValue());
             }
             if (i < columns.size() - 1) {
                 builder.append(", ");
