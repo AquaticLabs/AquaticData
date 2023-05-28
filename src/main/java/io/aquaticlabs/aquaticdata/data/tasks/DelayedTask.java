@@ -31,6 +31,7 @@ public class DelayedTask implements AquaticTask {
         return ownerId;
     }
 
+    @Override
     public void cancel() {
         futureTask.cancel(true);
     }

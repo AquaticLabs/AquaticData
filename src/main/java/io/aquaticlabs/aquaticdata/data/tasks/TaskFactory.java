@@ -57,6 +57,13 @@ public class TaskFactory {
         return new TaskFactory(ownerID);
     }
 
+
+    public SimpleTask runTask(AquaticRunnable runnable) {
+        SimpleTask task = new SimpleTask(this, scheduledExecutorService, runnable);
+        activeTasks.put(task.getId(), task);
+        return task;
+    }
+
     /**
      * Creates a new instance of {@link RepeatingTask} with the specified runnable and interval.
      *
