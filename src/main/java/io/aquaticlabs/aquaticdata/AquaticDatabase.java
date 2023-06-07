@@ -23,7 +23,7 @@ public class AquaticDatabase {
     @Getter
     private boolean debug = false;
     private Consumer<Runnable> asyncRunner;
-    private Consumer<Runnable> syncRunner = Runnable::run;
+    private Consumer<Runnable> syncRunner;
 
     public AquaticDatabase(@NonNull Consumer<Runnable> asyncRunner, @NonNull Consumer<Runnable> syncRunner, boolean debug, Logger logger) {
         if (instance != null) {
@@ -38,6 +38,7 @@ public class AquaticDatabase {
     }
 
     public Consumer<Runnable> getRunner(boolean async) {
+
         return async ? asyncRunner : syncRunner;
     }
 
