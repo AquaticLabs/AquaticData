@@ -23,11 +23,17 @@ public abstract class HikariCPDatabase extends ADatabase {
     public <T> T executeNonLockConnection(ConnectionRequest<T> connectionRequest) {
 
         try (Connection conn = hikariDataSource.getConnection()) {
-            return connectionRequest.getCallback().doInConnection(conn);
+            if (connectionRequest.getRunner() == null) {
+                DataDebugLog.logDebug("executeNonLockCon: runner is null");
+            }
+            return connectionRequest.getRequest().doInConnection(conn);
         } catch (SQLException e) {
             throw new IllegalStateException("Error during SQL execution.", e);
         } finally {
             DataDebugLog.logDebug("Closed Connection.");
+            for (Runnable runnable : connectionRequest.getWhenComplete()) {
+                connectionRequest.getRunner().accept(runnable);
+            }
             getConnectionQueue().tryToExecuteNextInQueue();
         }
     }

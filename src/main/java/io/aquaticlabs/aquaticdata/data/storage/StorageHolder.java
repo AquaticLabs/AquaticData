@@ -106,7 +106,7 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
             temporaryDataCache = new ObjectCache<>(this, timeOutTime, TimeUnit.MINUTES);
         }
         if (storageMode == StorageMode.LOAD_AND_STORE) {
-
+            // do nothing to remove the data
         }
     }
 
@@ -144,9 +144,12 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
             // I probably should just do this anyway? shouldn't be a specific feature?
             //saveLoaded(false, () -> DataDebugLog.logDebug("Saved Loaded on Shutdown."));
         }
-        saveLoaded(false, () -> DataDebugLog.logDebug("SaveLoaded on Shutdown."));
-        database.shutdown();
-        taskFactory.shutdown();
+        saveLoaded(false, () -> {
+            DataDebugLog.logDebug("SaveLoaded on Shutdown.");
+            database.shutdown();
+            taskFactory.shutdown();
+        }, false);
+
     }
 
     @Override
@@ -372,6 +375,10 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
     }
 
     public void saveLoaded(boolean async, Runnable run) {
+        saveLoaded(async, run, true);
+    }
+
+    public void saveLoaded(boolean async, Runnable callback, boolean createTask) {
         DataDebugLog.logDebug("Save Loaded");
 
         Consumer<Runnable> runner = AquaticDatabase.getInstance().getRunner(async);
@@ -408,12 +415,16 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
                 }
             }
             DataDebugLog.logDebug("Saved Loaded, Modified " + modified + " users.");
-            if (run != null) {
+            if (callback != null) {
                 DataDebugLog.logDebug("Running callback");
-                runner.accept(run);
+                if (createTask) {
+                    runner.accept(callback);
+                } else {
+                    callback.run();
+                }
             }
             return true;
-        }, runner));
+        }, createTask ? runner : null));
     }
 
     private List<DataEntry<String, String>> buildNeedsUpdate(T object, SerializedData data) {
@@ -430,15 +441,14 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
                 continue;
             }
 
-           // DataDebugLog.logDebug("Cache Details: " + columnName + " Cache Value Hash: " + cache.getCache().get(columnName) + " New Value Hash: " + cache.hashString(value));
-
+            // DataDebugLog.logDebug("Cache Details: " + columnName + " Cache Value Hash: " + cache.getCache().get(columnName) + " New Value Hash: " + cache.hashString(value));
 
             if (!cache.isOutdated(columnName, value)) {
-               // DataDebugLog.logDebug("Cache Is Up to date: " + columnName + " " + value);
+                // DataDebugLog.logDebug("Cache Is Up to date: " + columnName + " " + value);
                 continue;
             }
 
-           // DataDebugLog.logDebug("Cache Is Outdated... Needs Update: " + columnName + " Value: " + value);
+            // DataDebugLog.logDebug("Cache Is Outdated... Needs Update: " + columnName + " Value: " + value);
             needsUpdate.add(new DataEntry<>(columnName, value));
         }
         if (needsUpdate.isEmpty()) {
@@ -452,7 +462,6 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
         }
         return needsUpdate;
     }
-
 
     public void saveSingle(T object, boolean async) {
         Consumer<Runnable> runner = AquaticDatabase.getInstance().getRunner(async);
@@ -557,13 +566,15 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
 
 
                 int columnCount = 0;
+                int structureCount = 0;
                 while (result.next()) {
                     columnCount++;
+                    structureCount++;
                     String columnName = result.getString("COLUMN_NAME");
                     String columnTypeName = result.getString("TYPE_NAME");
                     // Use the column type name here
 
-                    DataDebugLog.logDebug("ColumnName:" + columnName + " ColumnType: " + columnTypeName);
+                    DataDebugLog.logDebug("Column Count: "  + columnCount + " Structure Count: "  + structureCount + " ColumnName:" + columnName + " ColumnType: " + columnTypeName);
 
                     ColumnType colType = ColumnType.matchType(columnTypeName);
 
@@ -573,7 +584,17 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
                         continue;
                     }
 
-                    if (!ColumnType.isSimilarMatching(object.getStructure().get(columnCount - 1).getValue(), colType)) {
+                    if (object.getStructure().stream().noneMatch((entry) -> entry.getKey().equalsIgnoreCase(columnName))) {
+                        needsChange.put(columnCount, columnName);
+                        structureCount--;
+                        continue;
+                    }
+
+                    if (object.getStructure().size() <= structureCount - 1) {
+                        DataDebugLog.logDebug("Weird issue with the structure size; ");
+                    }
+
+                    if (!ColumnType.isSimilarMatching(object.getStructure().get(structureCount - 1).getValue(), colType)) {
                         needsChange.put(columnCount, columnName);
                     }
                 }
@@ -625,7 +646,7 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
                 DataDebugLog.logDebug(stmt1);
 
                 try (PreparedStatement preparedStatement = conn.prepareStatement(stmt1)) {
-                    preparedStatement.executeUpdate();
+                    preparedStatement.executeQuery();
                 } catch (Exception ex) {
                     DataDebugLog.logDebug("Failed to Alter Table. " + ex.getMessage());
                 }
@@ -674,14 +695,14 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
                 }
             }
             return null;
-        }, runner));
-
-        if (!needsChange.isEmpty()) {
-            DataDebugLog.logDebug("table altered, moving to copying");
-            DataDebugLog.logDebug("Needs: " + needsChange);
-            return;
-        }
-        DataDebugLog.logDebug("table unchanged.");
+        }, runner).whenComplete(() -> {
+            if (!needsChange.isEmpty()) {
+                DataDebugLog.logDebug("table altered, moving to copying");
+                DataDebugLog.logDebug("Needs: " + needsChange);
+                return;
+            }
+            DataDebugLog.logDebug("table unchanged.");
+        }));
     }
 
     private T construct() {

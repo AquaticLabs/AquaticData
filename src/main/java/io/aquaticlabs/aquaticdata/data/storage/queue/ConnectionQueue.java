@@ -32,12 +32,16 @@ public class ConnectionQueue {
         DataDebugLog.logDebug("Executing Next in Queue. Queue Size: " + queuedRequests.size());
         ConnectionRequest<?> connectionRequest = queuedRequests.remove(0);
         try {
-            connectionRequest.getRunner().accept(() -> aDatabase.executeNonLockConnection(connectionRequest));
+            if (connectionRequest.getRunner() == null) {
+                DataDebugLog.logDebug("Creating Connection Request with Null Runner.");
+                aDatabase.executeNonLockConnection(connectionRequest);
+            } else {
+                connectionRequest.getRunner().accept(() -> aDatabase.executeNonLockConnection(connectionRequest));
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
-
 
 
     public void addConnectionRequest(ConnectionRequest<?> request) {

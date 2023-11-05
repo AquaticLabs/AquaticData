@@ -7,7 +7,8 @@ public enum ColumnType {
     LONG("INT(8)"),
     TEXT("TEXT"),
     VARCHAR("VARCHAR(255)"),
-    VARCHAR_UUID("VARCHAR(37)"),
+    VARCHAR_UUID("VARCHAR(36)"),
+    VARCHAR_UUID2("VARCHAR(37)"),
     VARCHAR_64("VARCHAR(64)"),
     DOUBLE("DOUBLE"),
     BOOLEAN("BOOLEAN");
@@ -36,7 +37,7 @@ public enum ColumnType {
     }
 
     public boolean isVarchar() {
-        return this.equals(VARCHAR) || this.equals(VARCHAR_UUID) || this.equals(VARCHAR_64) || this.equals(TEXT);
+        return this.equals(VARCHAR) || this.equals(VARCHAR_UUID)|| this.equals(VARCHAR_UUID2) || this.equals(VARCHAR_64) || this.equals(TEXT);
     }
 
     public boolean needsQuotes() {
