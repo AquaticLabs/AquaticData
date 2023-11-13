@@ -30,9 +30,14 @@ public abstract class HikariCPDatabase extends ADatabase {
         } catch (SQLException e) {
             throw new IllegalStateException("Error during SQL execution.", e);
         } finally {
-            DataDebugLog.logDebug("Closed Connection.");
-            for (Runnable runnable : connectionRequest.getWhenComplete()) {
-                connectionRequest.getRunner().accept(runnable);
+            DataDebugLog.logDebug("Closed Connection. Runnables: " + connectionRequest.getWhenCompleteRunnables().size());
+            for (Runnable runnable : connectionRequest.getWhenCompleteRunnables()) {
+                DataDebugLog.logDebug("Running WhenCompleteRunnable");
+                if (connectionRequest.getRunner() != null) {
+                    connectionRequest.getRunner().accept(runnable);
+                } else {
+                    runnable.run();
+                }
             }
             getConnectionQueue().tryToExecuteNextInQueue();
         }

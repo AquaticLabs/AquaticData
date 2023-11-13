@@ -4,14 +4,16 @@ public enum ColumnType {
     INT("INT"),
     INTEGER("INTEGER"),
     FLOAT("FLOAT"),
-    LONG("INT(8)"),
+    LONG("BIGINT"),
     TEXT("TEXT"),
     VARCHAR("VARCHAR(255)"),
     VARCHAR_UUID("VARCHAR(36)"),
     VARCHAR_UUID2("VARCHAR(37)"),
     VARCHAR_64("VARCHAR(64)"),
     DOUBLE("DOUBLE"),
-    BOOLEAN("BOOLEAN");
+    BOOLEAN("BOOLEAN"),
+    TINY_INT("TINYINT"),
+    BIT("BIT");
 
     private final String sql;
 
@@ -39,13 +41,16 @@ public enum ColumnType {
     public boolean isVarchar() {
         return this.equals(VARCHAR) || this.equals(VARCHAR_UUID)|| this.equals(VARCHAR_UUID2) || this.equals(VARCHAR_64) || this.equals(TEXT);
     }
+    public boolean isBoolean() {
+        return this.equals(BOOLEAN) || this.equals(BIT)|| this.equals(TINY_INT);
+    }
 
     public boolean needsQuotes() {
         return isVarchar();
     }
 
     public boolean isInt() {
-        return this.equals(INT) || this.equals(INTEGER) || this.equals(LONG) || this.equals(BOOLEAN);
+        return this.equals(INT) || this.equals(INTEGER);
     }
 
     public static boolean isSimilarMatching(ColumnType type1, ColumnType type2) {
@@ -53,6 +58,9 @@ public enum ColumnType {
             return true;
         }
         if (type1.isInt() && type2.isInt()) {
+            return true;
+        }
+        if (type1.isBoolean() && type2.isBoolean()) {
             return true;
         }
         return type1.getSql().equalsIgnoreCase(type2.getSql());

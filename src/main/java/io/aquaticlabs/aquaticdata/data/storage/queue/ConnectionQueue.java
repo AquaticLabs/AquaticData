@@ -51,4 +51,8 @@ public class ConnectionQueue {
             tryToExecuteNextInQueue();
         }
     }
+
+    public boolean isQueueRunning() {
+        return queueRunning;
+    }
 }

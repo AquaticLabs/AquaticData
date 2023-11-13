@@ -11,7 +11,7 @@ import java.util.ArrayList;
  */
 public abstract class StatObject implements DataObject {
 
-    protected abstract Object getDefaultStatValue(int statID);
+    public abstract void addEntry();
 
     public ArrayList<DataEntry<String, ColumnType>> getStructure() {
         ArrayList<DataEntry<String, ColumnType>> structure = new ArrayList<>();

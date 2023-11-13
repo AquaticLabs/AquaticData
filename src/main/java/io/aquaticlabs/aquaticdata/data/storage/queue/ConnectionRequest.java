@@ -19,16 +19,16 @@ public class ConnectionRequest<T> {
     @Getter
     private final HikariCPDatabase.ConnectionCallback<T> request;
     @Getter
-    private List<Runnable> whenComplete;
+    private List<Runnable> whenCompleteRunnables;
 
     public ConnectionRequest(HikariCPDatabase.ConnectionCallback<T> request, Consumer<Runnable> runner) {
         this.request = request;
         this.runner = runner;
-        this.whenComplete = new ArrayList<>();
+        this.whenCompleteRunnables = new ArrayList<>();
     }
 
     public ConnectionRequest<T> whenComplete(Runnable runnable) {
-        whenComplete.add(runnable);
+        whenCompleteRunnables.add(runnable);
         return this;
     }
 
