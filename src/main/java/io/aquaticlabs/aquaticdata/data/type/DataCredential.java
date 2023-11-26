@@ -1,13 +1,17 @@
 package io.aquaticlabs.aquaticdata.data.type;
 
 import io.aquaticlabs.aquaticdata.data.ADatabase;
+import io.aquaticlabs.aquaticdata.data.object.DataEntry;
 import io.aquaticlabs.aquaticdata.data.object.DataObject;
+import io.aquaticlabs.aquaticdata.data.storage.ColumnType;
+import io.aquaticlabs.aquaticdata.data.storage.SerializedData;
 import io.aquaticlabs.aquaticdata.data.type.mysql.MySQLDB;
 import io.aquaticlabs.aquaticdata.data.type.sqlite.SQLiteDB;
 import lombok.Getter;
 import lombok.Setter;
 
 import java.io.File;
+import java.util.ArrayList;
 
 /**
  * @Author: extremesnow
@@ -46,6 +50,10 @@ public class DataCredential {
         this.databaseName = databaseName;
         this.tableName = tableName;
         return this;
+    }
+
+    public boolean test() {
+        return false;
     }
 
 
