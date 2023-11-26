@@ -27,18 +27,6 @@ public class DataCredential {
     private String tableName;
     private File folder;
 
-/*
-    public DataCredential(String databaseName, String hostname, int port, String username, String password, String tableName) {
-        this.databaseName = databaseName;
-        this.hostname = hostname;
-        this.port = port;
-        this.username = username;
-        this.password = password;
-        this.useSSL = useSSL;
-        this.allowPublicKeyRetrieval = allowPublicKeyRetrieval;
-        this.tableName = tableName;
-    }
-*/
 
     public DataCredential() {
     }

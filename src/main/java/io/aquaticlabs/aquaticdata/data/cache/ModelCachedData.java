@@ -2,6 +2,9 @@ package io.aquaticlabs.aquaticdata.data.cache;
 
 import lombok.Getter;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -37,8 +40,18 @@ public class ModelCachedData {
   }
 
   public int hashString(String data) {
-    int hash = 0;
-    for (char c : data.toCharArray()) hash += Character.hashCode(c);
-    return hash;
+    try {
+      MessageDigest digest = MessageDigest.getInstance("SHA-256");
+      byte[] hash = digest.digest(data.getBytes(StandardCharsets.UTF_8));
+
+      // Take only the first 4 bytes (32 bits) of the hash
+      int result = 0;
+      for (int i = 0; i < Math.min(4, hash.length); i++) {
+        result = (result << 8) | (hash[i] & 0xFF);
+      }
+      return result;
+    } catch (NoSuchAlgorithmException e) {
+      throw new RuntimeException("SHA-256 algorithm not available", e);
+    }
   }
 }

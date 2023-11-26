@@ -12,7 +12,9 @@ import io.aquaticlabs.aquaticdata.data.tasks.RepeatingTask;
 import io.aquaticlabs.aquaticdata.data.tasks.TaskFactory;
 import io.aquaticlabs.aquaticdata.data.type.DataCredential;
 import io.aquaticlabs.aquaticdata.data.type.mysql.MySQLDB;
+import io.aquaticlabs.aquaticdata.data.type.sqlite.SQLiteDB;
 import io.aquaticlabs.aquaticdata.util.DataDebugLog;
+import io.aquaticlabs.aquaticdata.util.FactoryExistsThrowable;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.SneakyThrows;
@@ -23,6 +25,7 @@ import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -60,6 +63,7 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
     @Getter
     private long cacheTimeInSecondsToSave = (60L * 5);
 
+    private int standardBatchSize = 250; // Adjust the batch size as needed
 
     /**
      * The Time in Minutes data should timeout (only active when LOAD_AND_TIMEOUT storage mode is active)
@@ -89,14 +93,10 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
         addVariant(this.database.getTable(), clazz);
         initStorageMode(storageMode);
 
-        long startTime = System.currentTimeMillis();
 
-        confirmTable(t, false);
+        confirmTable(t, true);
 
         initCacheMode(cacheMode);
-
-        long endTime = System.currentTimeMillis();
-        DataDebugLog.logDebug("Confirm Table: " + (endTime - startTime) + "ms");
     }
 
 
@@ -144,9 +144,11 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
             // I probably should just do this anyway? shouldn't be a specific feature?
             //saveLoaded(false, () -> DataDebugLog.logDebug("Saved Loaded on Shutdown."));
         }
-        saveLoaded(false, () -> DataDebugLog.logDebug("SaveLoaded on Shutdown."));
-        database.shutdown();
-        taskFactory.shutdown();
+        saveLoaded(false, () -> {
+            DataDebugLog.logDebug("SaveLoaded on Shutdown.");
+            database.shutdown();
+            taskFactory.shutdown();
+        }, false);
     }
 
     @Override
@@ -370,8 +372,11 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
             return null;
         }, runner));
     }
-
     public void saveLoaded(boolean async, Runnable run) {
+        saveLoaded(async, run, true);
+    }
+
+    public void saveLoaded(boolean async, Runnable callback, boolean createTask) {
         DataDebugLog.logDebug("Save Loaded");
 
         Consumer<Runnable> runner = AquaticDatabase.getInstance().getRunner(async);
@@ -379,41 +384,75 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
         database.getConnectionQueue().addConnectionRequest(new ConnectionRequest<>(conn -> {
 
             int modified = 0;
-            for (T object : this) {
 
-                SerializedData data = new SerializedData();
-                object.serialize(data);
-                List<DataEntry<String, String>> columnList = data.toColumnList(object.getStructure());
+            try (Statement statement = conn.createStatement()) {
 
-                List<DataEntry<String, String>> needsUpdate = buildNeedsUpdate(object, data);
-                if (needsUpdate.isEmpty()) {
-                    continue;
-                }
-                modified++;
-                if (doesEntryExist(conn, columnList.get(0))) {
+                conn.setAutoCommit(false);
+                try {
+                    for (T object : this) {
 
-                    try {
-                        DataDebugLog.logDebug("Execute Update Statement");
-                        conn.createStatement().executeUpdate(database.buildUpdateStatementSQL(needsUpdate));
-                    } catch (SQLException e) {
-                        DataDebugLog.logDebug("Fail Updating Data: " + e.getMessage());
+                        SerializedData data = new SerializedData();
+                        object.serialize(data);
+                        List<DataEntry<String, String>> columnList = data.toColumnList(object.getStructure());
+
+                        List<DataEntry<String, String>> needsUpdate = buildNeedsUpdate(object, data);
+                        if (needsUpdate.isEmpty()) {
+                            continue;
+                        }
+                        modified++;
+                        if (doesEntryExist(conn, columnList.get(0))) {
+
+                            try {
+                                DataDebugLog.logDebug("Adding Update Batch Statement");
+                                statement.addBatch(database.buildUpdateStatementSQL(needsUpdate));
+                                //conn.createStatement().executeUpdate(database.buildUpdateStatementSQL(needsUpdate));
+                            } catch (SQLException e) {
+                                DataDebugLog.logDebug("Failed adding batch Data: " + e.getMessage());
+                            }
+                        } else {
+                            try {
+                                DataDebugLog.logDebug("Adding Insert Batch Statement");
+                                statement.addBatch(database.insertStatement(columnList));
+                            } catch (SQLException e) {
+                                DataDebugLog.logDebug("Fail Inserting Data: " + e.getMessage());
+                            }
+                        }
+
+
+                        if (modified % standardBatchSize == 0) {
+                            try {
+                                statement.executeBatch();
+                                statement.clearBatch();
+
+                                DataDebugLog.logDebug("Success executing batch of " + modified);
+
+                            } catch (SQLException e) {
+                                DataDebugLog.logDebug("Failed executing batch: " + e.getMessage());
+                            }
+                        }
                     }
-                } else {
-                    try {
-                        DataDebugLog.logDebug("Execute Insert Statement");
-                        conn.createStatement().executeUpdate(database.insertStatement(columnList));
-                    } catch (SQLException e) {
-                        DataDebugLog.logDebug("Fail Inserting Data: " + e.getMessage());
+                    DataDebugLog.logDebug("Executing Last batch of " + modified);
+                    statement.executeBatch();
+
+                    conn.commit(); // Commit the transaction
+                } catch (SQLException e) {
+                    conn.rollback();
+                }
+                conn.setAutoCommit(true);
+
+
+                DataDebugLog.logDebug("Saved Loaded, Modified " + modified + " users.");
+                if (callback != null) {
+                    DataDebugLog.logDebug("Running callback");
+                    if (createTask) {
+                        runner.accept(callback);
+                    } else {
+                        callback.run();
                     }
                 }
+                return true;
             }
-            DataDebugLog.logDebug("Saved Loaded, Modified " + modified + " users.");
-            if (run != null) {
-                DataDebugLog.logDebug("Running callback");
-                runner.accept(run);
-            }
-            return true;
-        }, runner));
+        }, createTask ? runner : null));
     }
 
     private List<DataEntry<String, String>> buildNeedsUpdate(T object, SerializedData data) {
@@ -431,7 +470,6 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
             }
 
            // DataDebugLog.logDebug("Cache Details: " + columnName + " Cache Value Hash: " + cache.getCache().get(columnName) + " New Value Hash: " + cache.hashString(value));
-
 
             if (!cache.isOutdated(columnName, value)) {
                // DataDebugLog.logDebug("Cache Is Up to date: " + columnName + " " + value);
@@ -452,7 +490,6 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
         }
         return needsUpdate;
     }
-
 
     public void saveSingle(T object, boolean async) {
         Consumer<Runnable> runner = AquaticDatabase.getInstance().getRunner(async);
@@ -545,44 +582,57 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
         Consumer<Runnable> runner = AquaticDatabase.getInstance().getRunner(async);
         String tempTableName = "AquaticDataTempTable";
         DataDebugLog.logDebug("confirm table?");
+        final long startTime = System.currentTimeMillis();
 
 
-        database.getConnectionQueue().addConnectionRequest(new ConnectionRequest<>(conn -> {
+        database.executeNonLockConnection(new ConnectionRequest<>(conn -> {
 
             try {
-                DatabaseMetaData metaData = conn.getMetaData();
 
+                DatabaseMetaData metaData = conn.getMetaData();
 
                 ResultSet result = metaData.getColumns(null, null, database.getTable(), null);
 
 
-                int columnCount = 0;
+                int structureCount = 0;
                 while (result.next()) {
-                    columnCount++;
-                    String columnName = result.getString("COLUMN_NAME");
-                    String columnTypeName = result.getString("TYPE_NAME");
-                    // Use the column type name here
 
-                    DataDebugLog.logDebug("ColumnName:" + columnName + " ColumnType: " + columnTypeName);
+                    structureCount++;
+                    String databaseColumnName = result.getString("COLUMN_NAME");
+                    String databaseColumnTypeName = result.getString("TYPE_NAME");
 
-                    ColumnType colType = ColumnType.matchType(columnTypeName);
+                    // for each column in the database
 
+                    // check if the columntype exists in my enum
+                    // debug print
+                    DataDebugLog.logDebug("Structure Count: " + structureCount + " ColumnName:" + databaseColumnName + " ColumnType: " + databaseColumnTypeName);
+
+                    ColumnType colType = ColumnType.matchType(databaseColumnTypeName);
 
                     if (colType == null) {
-                        needsChange.put(columnCount, columnName);
+                        needsChange.put(structureCount - 1, databaseColumnName);
                         continue;
                     }
 
-                    if (!ColumnType.isSimilarMatching(object.getStructure().get(columnCount - 1).getValue(), colType)) {
-                        needsChange.put(columnCount, columnName);
+
+                    if (object.getStructure().stream().noneMatch(entry -> entry.getKey().equalsIgnoreCase(databaseColumnName))) {
+                        needsChange.put(structureCount - 1, databaseColumnName);
+                        continue;
+                    }
+
+                    if (object.getStructure().size() <= structureCount - 1) {
+                        DataDebugLog.logDebug("Weird issue with the structure size; ");
+                    }
+
+                    DataEntry<String, ColumnType> structureEntry = object.getStructure().get(structureCount - 1);
+                    String structureColumnName = structureEntry.getKey();
+                    ColumnType structureColumnType = structureEntry.getValue();
+
+
+                    if (!ColumnType.isSimilarMatching(structureColumnType, colType)) {
+                        needsChange.put(structureCount - 1, databaseColumnName);
                     }
                 }
-
-
-                if (columnCount != object.getStructure().size()) {
-                    needsChange.put(1, "dummy");
-                }
-
 
             } catch (Exception e) {
                 throw new IllegalStateException("Failed to confirm table, strange Column Types/Names.", e);
@@ -595,8 +645,15 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
                 if (database instanceof MySQLDB) {
                     for (Map.Entry<Integer, String> e : needsChange.entrySet()) {
 
+                        String stmt = "ALTER TABLE " + database.getTable();
 
-                        String stmt = "ALTER TABLE " + database.getTable() + " MODIFY COLUMN `" + e.getValue() + "` " + object.getStructure().get(e.getKey()).getValue().getSql() + " NOT NULL DEFAULT '0';;";
+                        if (object.getStructure().stream().noneMatch(entry -> entry.getKey().equalsIgnoreCase(e.getValue()))) {
+                            stmt += " DROP COLUMN `" + e.getValue() + "`;";
+                        } else {
+                            stmt += " MODIFY COLUMN `" + e.getValue() + "` " + object.getStructure().get(e.getKey()).getValue().getSql() + " NOT NULL DEFAULT '0';";
+                        }
+
+
                         DataDebugLog.logDebug(stmt);
 
                         try (PreparedStatement preparedStatement = conn.prepareStatement(stmt)) {
@@ -610,78 +667,111 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
                     }
                     return null;
                 }
-                // otherwise annoyingly annoying table copying
 
+                if (database instanceof SQLiteDB) {
+                    // otherwise annoyingly annoying table copying
+                    String dropConflict = "DROP TABLE IF EXISTS " + tempTableName + ";";
 
-                String dropConflict = "DROP TABLE IF EXISTS " + tempTableName + ";";
-
-                try (PreparedStatement preparedStatement = conn.prepareStatement(dropConflict)) {
-                    preparedStatement.executeUpdate();
-                } catch (Exception ex) {
-                    DataDebugLog.logDebug("Failed to drop if exists Table. " + ex.getMessage());
-                }
-
-                String stmt1 = "ALTER TABLE " + database.getTable() + " RENAME TO " + tempTableName + ";";
-                DataDebugLog.logDebug(stmt1);
-
-                try (PreparedStatement preparedStatement = conn.prepareStatement(stmt1)) {
-                    preparedStatement.executeUpdate();
-                } catch (Exception ex) {
-                    DataDebugLog.logDebug("Failed to Alter Table. " + ex.getMessage());
-                }
-
-
-                ArrayList<DataEntry<String, ColumnType>> structure = object.getStructure();
-                database.createTable(structure, true);
-                DataDebugLog.logDebug("copy");
-
-                try (ResultSet rs = conn.createStatement().executeQuery("SELECT * FROM " + tempTableName)) {
-
-                    T dummy = construct();
-
-                    while (rs.next()) {
-                        List<DataEntry<String, Object>> data = new LinkedList<>();
-                        for (DataEntry<String, ColumnType> entry : structure) {
-                            try {
-                                rs.findColumn(entry.getKey());
-                            } catch (SQLException sql) {
-                                data.add(new DataEntry<>(entry.getKey(), object.getDefaultDataValue(entry.getKey())));
-                                continue;
-                            }
-                            data.add(new DataEntry<>(entry.getKey(), rs.getObject(entry.getKey())));
-                        }
-                        SerializedData serializedData = new SerializedData();
-                        serializedData.fromQuery(data);
-                        assert dummy != null;
-                        dummy.deserialize(serializedData);
-
-                        try {
-                            conn.createStatement().executeUpdate(database.insertStatement(serializedData.toColumnList(dummy.getStructure())));
-                            DataDebugLog.logDebug("Success Inserting New Data");
-                        } catch (SQLException e) {
-                            DataDebugLog.logDebug("Fail Inserting New Data: " + e.getMessage());
-                        }
+                    try (PreparedStatement preparedStatement = conn.prepareStatement(dropConflict)) {
+                        preparedStatement.executeUpdate();
+                    } catch (Exception ex) {
+                        DataDebugLog.logDebug("Failed to drop if exists Table. " + ex.getMessage());
                     }
-                } catch (SQLException e) {
-                    e.printStackTrace();
-                }
 
-                String dropStmt = "DROP TABLE '" + tempTableName + "'";
-                try (PreparedStatement preparedStatement = conn.prepareStatement(dropStmt)) {
-                    preparedStatement.executeUpdate();
-                } catch (Exception ex) {
-                    DataDebugLog.logDebug("Failed to Drop temp Table. " + ex.getMessage());
+
+                    String stmt1 = "ALTER TABLE " + database.getTable() + " RENAME TO " + tempTableName + ";";
+                    DataDebugLog.logDebug(stmt1);
+
+                    try (PreparedStatement preparedStatement = conn.prepareStatement(stmt1)) {
+                        preparedStatement.executeQuery();
+                        DataDebugLog.logDebug("Success renaming table.");
+
+                    } catch (Exception ex) {
+                        DataDebugLog.logDebug("Failed to Alter Table. " + ex.getMessage());
+                    }
+
+                    conn.setAutoCommit(false); // Start a transaction
+
+                    ArrayList<DataEntry<String, ColumnType>> structure = object.getStructure();
+                    database.createTable(structure, true);
+                    DataDebugLog.logDebug("copy");
+
+                    try (ResultSet rs = conn.createStatement().executeQuery("SELECT * FROM " + tempTableName)) {
+
+                        Statement statement = conn.createStatement();
+
+                        int count = 0;
+                        T dummy = construct();
+
+                        while (rs.next()) {
+
+                            List<DataEntry<String, Object>> data = new LinkedList<>();
+
+                            for (DataEntry<String, ColumnType> entry : structure) {
+                                try {
+                                    rs.findColumn(entry.getKey());
+                                } catch (SQLException sql) {
+                                    data.add(new DataEntry<>(entry.getKey(), object.getDefaultDataValue(entry.getKey())));
+                                    continue;
+                                }
+                                data.add(new DataEntry<>(entry.getKey(), rs.getObject(entry.getKey())));
+                            }
+
+                            SerializedData serializedData = new SerializedData();
+                            serializedData.fromQuery(data);
+                            assert dummy != null;
+                            dummy.deserialize(serializedData);
+
+                            String insertStatement = database.insertStatement(serializedData.toColumnList(dummy.getStructure()));
+                            statement.addBatch(insertStatement);
+                            count++;
+
+                            if (count % standardBatchSize == 0) {
+                                try {
+                                    statement.executeBatch();
+                                    statement.clearBatch();
+
+                                    DataDebugLog.logDebug("Success executing batch of " + count);
+
+                                } catch (SQLException e) {
+                                    DataDebugLog.logDebug("Failed executing batch: " + e.getMessage());
+                                }
+                            }
+                        }
+                        DataDebugLog.logDebug("Executing Last batch of " + count);
+
+                        statement.executeBatch();
+
+
+                        conn.commit(); // Commit the transaction
+                    } catch (SQLException e) {
+                        conn.rollback();
+                        e.printStackTrace();
+                    }
+
+                    String dropStmt = "DROP TABLE '" + tempTableName + "'";
+                    try (PreparedStatement preparedStatement = conn.prepareStatement(dropStmt)) {
+                        preparedStatement.executeUpdate();
+
+                    } catch (Exception ex) {
+                        DataDebugLog.logDebug("Failed to Drop temp Table. " + ex.getMessage());
+                    }
                 }
             }
-            return null;
-        }, runner));
+            conn.setAutoCommit(true); // Start a transaction
 
-        if (!needsChange.isEmpty()) {
-            DataDebugLog.logDebug("table altered, moving to copying");
-            DataDebugLog.logDebug("Needs: " + needsChange);
-            return;
-        }
-        DataDebugLog.logDebug("table unchanged.");
+            return true;
+        }, runner).whenComplete(() -> {
+            long endTime = System.currentTimeMillis();
+            DataDebugLog.logDebug("Confirmed Table:  " + database.getTable() + " took " + (endTime - startTime) + "ms");
+            if (!needsChange.isEmpty()) {
+                DataDebugLog.logDebug("table altered");
+                DataDebugLog.logDebug("Needed: " + needsChange);
+                return;
+            }
+            DataDebugLog.logDebug("table unchanged.");
+
+        }));
     }
 
     private T construct() {

@@ -35,7 +35,7 @@ public class MySQLDB extends HikariCPDatabase {
         config.setDriverClassName("com.mysql.jdbc.Driver");
 
         String url = "jdbc:mysql://" + dataCredential.getHostname() + ":" + dataCredential.getPort() + "/" + dataCredential.getDatabaseName();
-        url += "?allowPublicKeyRetrieval=" + dataCredential.isAllowPublicKeyRetrieval() + "&useSSL=" + dataCredential.isUseSSL();
+        url += "?allowPublicKeyRetrieval=" + dataCredential.isAllowPublicKeyRetrieval() + "&useSSL=" + dataCredential.isUseSSL() + "&characterEncoding=utf8";
 
         config.setJdbcUrl(url);
 
