@@ -8,6 +8,7 @@ import lombok.SneakyThrows;
 import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public class StorageUtil {
@@ -29,6 +30,57 @@ public class StorageUtil {
         return primitiveList.contains(clazz);
     }
 
+
+
+    public static void calculateMoves(Map<String, String> movesNeeded, List<String> order, List<String> desiredOrder) {
+        List<String> fixing = new ArrayList<>(order);
+        int maxIterator = 0;
+        while (!isIdentical(fixing, desiredOrder) && maxIterator <= 10) {
+            changeOrder(movesNeeded, fixing, desiredOrder);
+            maxIterator++;
+        }
+    }
+
+    public static boolean isIdentical(List<String> list1, List<String> list2) {
+        if (list1.size() != list2.size()) {
+            return false;
+        }
+        for (int i = 0; i < list1.size(); i++) {
+            if (!list1.get(i).equals(list2.get(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+    public static void changeOrder(Map<String, String> movesNeeded, List<String> fixing, List<String> desiredOrder) {
+        List<String> fixingClone = new ArrayList<>(fixing);
+        int invalidPos = -1;
+
+        int i = 0;
+        for (String value : fixingClone) {
+            String desiredVal = desiredOrder.get(i);
+            if (!desiredVal.equals(value) && invalidPos == -1) {
+                invalidPos = i++;
+                continue;
+            }
+            if (invalidPos == -1) {
+                i++;
+                continue;
+            }
+
+            String monitoredVal = desiredOrder.get(invalidPos);
+
+            if (monitoredVal.equals(value)) {
+                movesNeeded.put(value, desiredOrder.get(invalidPos - 1));
+
+                fixing.remove(value);
+                fixing.add(invalidPos, value);
+
+
+            }
+            i++;
+        }
+    }
 
 /*
     public static JsonElement primitiveToString(Object object) {

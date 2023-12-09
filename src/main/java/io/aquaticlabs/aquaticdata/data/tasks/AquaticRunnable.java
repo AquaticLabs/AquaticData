@@ -30,7 +30,7 @@ public abstract class AquaticRunnable implements Runnable {
     }
     public synchronized String getOwnerID() throws IllegalStateException {
         final String owner = ownerId;
-        if (owner.equals("")) {
+        if (owner.isEmpty()) {
             throw new IllegalStateException("Invalid owner, probably not scheduled yet");
         }
         return owner;

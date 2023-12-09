@@ -14,7 +14,7 @@ import io.aquaticlabs.aquaticdata.data.type.DataCredential;
 import io.aquaticlabs.aquaticdata.data.type.mysql.MySQLDB;
 import io.aquaticlabs.aquaticdata.data.type.sqlite.SQLiteDB;
 import io.aquaticlabs.aquaticdata.util.DataDebugLog;
-import io.aquaticlabs.aquaticdata.util.FactoryExistsThrowable;
+import io.aquaticlabs.aquaticdata.util.StorageUtil;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.SneakyThrows;
@@ -26,14 +26,11 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 /**
  * @Author: extremesnow
@@ -74,7 +71,6 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
 
 
     protected StorageHolder(DataCredential dataCredential, Class<T> clazz, StorageMode storageMode, CacheMode cacheMode) {
-
         T t;
         try {
             t = constructorOf(clazz).newInstance();
@@ -372,6 +368,7 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
             return null;
         }, runner));
     }
+
     public void saveLoaded(boolean async, Runnable run) {
         saveLoaded(async, run, true);
     }
@@ -469,14 +466,14 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
                 continue;
             }
 
-           // DataDebugLog.logDebug("Cache Details: " + columnName + " Cache Value Hash: " + cache.getCache().get(columnName) + " New Value Hash: " + cache.hashString(value));
+            // DataDebugLog.logDebug("Cache Details: " + columnName + " Cache Value Hash: " + cache.getCache().get(columnName) + " New Value Hash: " + cache.hashString(value));
 
             if (!cache.isOutdated(columnName, value)) {
-               // DataDebugLog.logDebug("Cache Is Up to date: " + columnName + " " + value);
+                // DataDebugLog.logDebug("Cache Is Up to date: " + columnName + " " + value);
                 continue;
             }
 
-           // DataDebugLog.logDebug("Cache Is Outdated... Needs Update: " + columnName + " Value: " + value);
+            // DataDebugLog.logDebug("Cache Is Outdated... Needs Update: " + columnName + " Value: " + value);
             needsUpdate.add(new DataEntry<>(columnName, value));
         }
         if (needsUpdate.isEmpty()) {
@@ -578,95 +575,160 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
 
 
     public void confirmTable(T object, boolean async) {
-        Map<Integer, String> needsChange = new HashMap<>();
         Consumer<Runnable> runner = AquaticDatabase.getInstance().getRunner(async);
         String tempTableName = "AquaticDataTempTable";
         DataDebugLog.logDebug("confirm table?");
         final long startTime = System.currentTimeMillis();
 
+        AtomicBoolean needsAltering = new AtomicBoolean(false);
+        Set<String> removeColumns = new HashSet<>();
+        Map<String, ColumnType> retypeColumns = new LinkedHashMap<>();
+        Map<String, String> moveColumns = new LinkedHashMap<>();
+        Map<String, DataEntry<String, ColumnType>> addColumns = new LinkedHashMap<>();
 
         database.executeNonLockConnection(new ConnectionRequest<>(conn -> {
 
+            Map<String, DataEntry<String, ColumnType>> structureMap = new LinkedHashMap<>();
+            for (DataEntry<String, ColumnType> entry : object.getStructure()) {
+                structureMap.put(entry.getKey(), entry);
+            }
+
             try {
 
-                DatabaseMetaData metaData = conn.getMetaData();
+                List<String> structureColumns = object.getStructure().stream().map(DataEntry::getKey).collect(Collectors.toList());
 
+                DatabaseMetaData metaData = conn.getMetaData();
                 ResultSet result = metaData.getColumns(null, null, database.getTable(), null);
 
-
-                int structureCount = 0;
+                Map<String, DataEntry<String, String>> databaseColumns = new LinkedHashMap<>();
                 while (result.next()) {
+                    String colName = result.getString("COLUMN_NAME");
+                    databaseColumns.put(colName, new DataEntry<>(colName, result.getString("TYPE_NAME")));
+                }
 
-                    structureCount++;
-                    String databaseColumnName = result.getString("COLUMN_NAME");
-                    String databaseColumnTypeName = result.getString("TYPE_NAME");
-
-                    // for each column in the database
-
-                    // check if the columntype exists in my enum
-                    // debug print
-                    DataDebugLog.logDebug("Structure Count: " + structureCount + " ColumnName:" + databaseColumnName + " ColumnType: " + databaseColumnTypeName);
-
-                    ColumnType colType = ColumnType.matchType(databaseColumnTypeName);
-
-                    if (colType == null) {
-                        needsChange.put(structureCount - 1, databaseColumnName);
-                        continue;
-                    }
-
-
-                    if (object.getStructure().stream().noneMatch(entry -> entry.getKey().equalsIgnoreCase(databaseColumnName))) {
-                        needsChange.put(structureCount - 1, databaseColumnName);
-                        continue;
-                    }
-
-                    if (object.getStructure().size() <= structureCount - 1) {
-                        DataDebugLog.logDebug("Weird issue with the structure size; ");
-                    }
-
-                    DataEntry<String, ColumnType> structureEntry = object.getStructure().get(structureCount - 1);
-                    String structureColumnName = structureEntry.getKey();
-                    ColumnType structureColumnType = structureEntry.getValue();
-
-
-                    if (!ColumnType.isSimilarMatching(structureColumnType, colType)) {
-                        needsChange.put(structureCount - 1, databaseColumnName);
+                // This column name isn't inside the structure
+                for (String col : databaseColumns.keySet()) {
+                    if (!structureColumns.contains(col)) {
+                        removeColumns.add(col);
+                        needsAltering.set(true);
                     }
                 }
+
+
+                int addCurrent = 0;
+                for (DataEntry<String, ColumnType> entry : object.getStructure()) {
+                    if (!databaseColumns.containsKey(entry.getKey())) {
+                        addColumns.put(structureColumns.get(addCurrent - 1), entry);
+                        needsAltering.set(true);
+                    }
+                    addCurrent++;
+                }
+
+
+                Map<String, DataEntry<String, String>> dataClone = new LinkedHashMap<>(databaseColumns);
+
+                for (String col : removeColumns) {
+                    dataClone.remove(col);
+                }
+
+                List<String> dataMirrorArray = new ArrayList<>(dataClone.keySet());
+
+                for (Map.Entry<String, DataEntry<String, ColumnType>> colEntry : addColumns.entrySet()) {
+                    String colName = colEntry.getValue().getKey();
+                    int addAtInt = 0;
+                    for (String col : structureColumns) {
+                        if (colName.equals(col)) {
+                            break;
+                        }
+                        addAtInt++;
+                    }
+                    if (dataMirrorArray.size() < addAtInt) {
+                        dataMirrorArray.add(colName);
+                        continue;
+                    }
+                    dataMirrorArray.add(addAtInt, colName);
+                }
+
+                StorageUtil.calculateMoves(moveColumns, dataMirrorArray,structureColumns);
+                if (!moveColumns.isEmpty()) {
+                    needsAltering.set(true);
+                }
+
+
+                for (DataEntry<String, String> dataEntry : databaseColumns.values()) {
+                    if (!structureMap.containsKey(dataEntry.getKey())) {
+                        continue;
+                    }
+                    ColumnType structureColumnType = structureMap.get(dataEntry.getKey()).getValue();
+
+                    String databaseColumnName = dataEntry.getKey();
+                    String databaseColumnTypeName = dataEntry.getValue();
+                    ColumnType databaseColType = ColumnType.matchType(databaseColumnTypeName);
+
+                    // Column type is wrong
+                    if (databaseColType == null || !ColumnType.isSimilarMatching(structureColumnType, databaseColType)) {
+                        needsAltering.set(true);
+                        retypeColumns.put(databaseColumnName, structureColumnType);
+                    }
+                }
+
 
             } catch (Exception e) {
                 throw new IllegalStateException("Failed to confirm table, strange Column Types/Names.", e);
             }
+            DataDebugLog.logDebug("Table Needs Alter: " + needsAltering);
 
-            DataDebugLog.logDebug(needsChange);
 
-            if (!needsChange.isEmpty()) {
-
+            if (needsAltering.get()) {
                 if (database instanceof MySQLDB) {
-                    for (Map.Entry<Integer, String> e : needsChange.entrySet()) {
-
-                        String stmt = "ALTER TABLE " + database.getTable();
-
-                        if (object.getStructure().stream().noneMatch(entry -> entry.getKey().equalsIgnoreCase(e.getValue()))) {
-                            stmt += " DROP COLUMN `" + e.getValue() + "`;";
-                        } else {
-                            stmt += " MODIFY COLUMN `" + e.getValue() + "` " + object.getStructure().get(e.getKey()).getValue().getSql() + " NOT NULL DEFAULT '0';";
-                        }
+                    List<String> batches = new ArrayList<>();
 
 
-                        DataDebugLog.logDebug(stmt);
+                    String alterStmt = "ALTER TABLE " + database.getTable();
 
-                        try (PreparedStatement preparedStatement = conn.prepareStatement(stmt)) {
+                    // First up: removes
 
-
-                            preparedStatement.executeUpdate();
-                        } catch (Exception ex) {
-                            ex.printStackTrace();
-                            throw new IllegalStateException("Failed to Alter Table.", ex);
-                        }
+                    for (String col : removeColumns) {
+                        batches.add(alterStmt + " DROP COLUMN " + col + ";");
                     }
+
+                    // Next is adds
+
+                    for (Map.Entry<String, DataEntry<String, ColumnType>> columnEntry : addColumns.entrySet()) {
+                        batches.add(alterStmt + " ADD " + columnEntry.getValue().getKey() + " " + columnEntry.getValue().getValue().getSql() + " NOT NULL AFTER " + columnEntry.getKey() + ";");
+                    }
+
+                    // Now moves
+
+                    for (Map.Entry<String, String> moveEntry : moveColumns.entrySet()) {
+                        batches.add(alterStmt + " CHANGE " + moveEntry.getKey() + " " + moveEntry.getKey() + " " + structureMap.get(moveEntry.getKey()).getValue().getSql() + " NOT NULL AFTER " + moveEntry.getValue() + ";");
+                    }
+
+                    // Lastly Type Changes
+                    for (Map.Entry<String, ColumnType> retypeEntry : retypeColumns.entrySet()) {
+                        batches.add(alterStmt + " MODIFY COLUMN `" + retypeEntry.getKey() + "` " + retypeEntry.getValue().getSql() + " NOT NULL DEFAULT '0';");
+                    }
+
+ /*                   for (String s : batches) {
+                        System.out.println(s);
+                    }
+*/
+
+                    try (Statement statement = conn.createStatement()) {
+
+                        for (String batch : batches) {
+                            statement.addBatch(batch);
+                        }
+                        statement.executeBatch();
+                        DataDebugLog.logDebug("Success executing alter table batches.");
+
+                    } catch (Exception ex) {
+                        DataDebugLog.logDebug("Failed to Alter Table. " + ex.getMessage());
+                    }
+
                     return null;
                 }
+
 
                 if (database instanceof SQLiteDB) {
                     // otherwise annoyingly annoying table copying
@@ -690,13 +752,13 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
                         DataDebugLog.logDebug("Failed to Alter Table. " + ex.getMessage());
                     }
 
-                    conn.setAutoCommit(false); // Start a transaction
 
                     ArrayList<DataEntry<String, ColumnType>> structure = object.getStructure();
                     database.createTable(structure, true);
                     DataDebugLog.logDebug("copy");
 
                     try (ResultSet rs = conn.createStatement().executeQuery("SELECT * FROM " + tempTableName)) {
+                        conn.setAutoCommit(false); // Start a transaction
 
                         Statement statement = conn.createStatement();
 
@@ -764,15 +826,22 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
         }, runner).whenComplete(() -> {
             long endTime = System.currentTimeMillis();
             DataDebugLog.logDebug("Confirmed Table:  " + database.getTable() + " took " + (endTime - startTime) + "ms");
-            if (!needsChange.isEmpty()) {
-                DataDebugLog.logDebug("table altered");
-                DataDebugLog.logDebug("Needed: " + needsChange);
+            if (needsAltering.get()) {
+                DataDebugLog.logDebug("Table altered");
+                DataDebugLog.logDebug("Needed:");
+                DataDebugLog.logDebug("Removes: " + removeColumns);
+                DataDebugLog.logDebug("Adds: " + addColumns.values().stream().map(DataEntry::getKey).collect(Collectors.toList()));
+                DataDebugLog.logDebug("Moves: " + moveColumns.keySet());
+                DataDebugLog.logDebug("Retypes: " + retypeColumns.keySet());
                 return;
             }
             DataDebugLog.logDebug("table unchanged.");
 
         }));
     }
+
+
+
 
     private T construct() {
         T dummy;
