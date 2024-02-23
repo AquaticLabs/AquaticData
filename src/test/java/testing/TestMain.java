@@ -6,8 +6,8 @@ import io.aquaticlabs.aquaticdata.data.tasks.AquaticRunnable;
 import io.aquaticlabs.aquaticdata.data.tasks.RepeatingTask;
 import io.aquaticlabs.aquaticdata.data.tasks.TaskFactory;
 import io.aquaticlabs.aquaticdata.data.type.DataCredential;
+import io.aquaticlabs.aquaticdata.util.DataDebugLog;
 
-import java.io.File;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -23,11 +23,23 @@ public class TestMain {
     public static TestHold testHold;
 
     public static void main(String[] args) {
-        AquaticDatabase aquaticDatabase = new AquaticDatabase(CompletableFuture::runAsync, Runnable::run, true, Logger.getAnonymousLogger());
+        AquaticDatabase aquaticDatabase = new AquaticDatabase(CompletableFuture::runAsync, Runnable::run, true, Logger.getLogger("AqLabs"));
 
-        DataCredential sqlite = new DataCredential().SQLiteCredential(new File("G:\\Projects\\DataStuff"), "apvpleveling_stats", "apvpleveling_stats");
+        //DataCredential sqlite = new DataCredential().SQLiteCredential(new File("G:\\Projects\\DataStuff"), "testDataConfirmTables", "testDataConfirmTables");
+        DataCredential mariaDB = new DataCredential().MariaDBCredential("testtable", "localhost", 3306, "root","password","testingMariaDB");
 
-        testHold = new TestHold(sqlite);
+        testHold = new TestHold(mariaDB);
+
+        //TestData testData = testHold.getOrInsert(new TestData(UUID.fromString("269d4132-8758-458f-9087-344325ee14cf"), "Rod", 42));
+        //testHold.saveSingle(testData,true);
+/*        TestData testData2 = testHold.getOrInsert(new TestData(UUID.randomUUID(), "Shod", 11));
+        TestData testData3 = testHold.getOrInsert(new TestData(UUID.randomUUID(), "Brodd", 24));
+        TestData testData4 = testHold.getOrInsert(new TestData(UUID.randomUUID(), "Nod", 5));
+        TestData testData5 = testHold.getOrInsert(new TestData(UUID.randomUUID(), "Lodd", 53));*/
+
+
+        testHold.saveLoaded(false);
+
 
         AtomicInteger secs = new AtomicInteger();
 
@@ -44,13 +56,15 @@ public class TestMain {
         factory.createDelayedTask(new AquaticRunnable() {
             @Override
             public void run() {
+                DataDebugLog.logDebug("DELAYED TASK RAN");
                 TestData data = testHold.getOrNull(UUID.fromString("269d4132-8758-458f-9087-344325ee14cf"));
-                System.out.println("Data OBJ: ");
-                System.out.println(data.toString());
+                DataDebugLog.logDebug("UUID: " + data.uuid + " Name: " + data.name + " val: " + data.getLevel());
+
             }
         }, 3);
 
 
+/*
         factory.createDelayedTask(new AquaticRunnable() {
             @Override
             public void run() {
@@ -73,11 +87,12 @@ public class TestMain {
 
         }, 5);
 
+*/
 
-        System.out.println(testHold.getCacheTimeInSecondsToSave());
+        System.out.println("cache time seconds to save: " + testHold.getCacheTimeInSecondsToSave());
 
         testHold.getDatabase().getConnectionQueue().addConnectionRequest(new ConnectionRequest<>(conn -> {
-            System.out.println(testHold.getDataSize(conn));
+            System.out.println("DataSize: " + testHold.getDataSize(conn));
             return null;
         }, aquaticDatabase.getRunner(true)));
 

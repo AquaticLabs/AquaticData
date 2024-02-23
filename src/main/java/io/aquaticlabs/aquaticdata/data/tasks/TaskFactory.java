@@ -1,6 +1,7 @@
 package io.aquaticlabs.aquaticdata.data.tasks;
 
 import io.aquaticlabs.aquaticdata.util.DataDebugLog;
+import io.aquaticlabs.aquaticdata.util.FactoryExistsThrowable;
 import lombok.Getter;
 
 import java.util.HashMap;
@@ -53,6 +54,13 @@ public class TaskFactory {
     public static TaskFactory getOrNew(String ownerID) {
         if (factories.stream().anyMatch(taskFactory -> taskFactory.getOwnerID().equalsIgnoreCase(ownerID))) {
             return getFactory(ownerID);
+        }
+        return new TaskFactory(ownerID);
+    }
+
+    public static TaskFactory create(String ownerID) throws FactoryExistsThrowable {
+        if (factories.stream().anyMatch(taskFactory -> taskFactory.getOwnerID().equalsIgnoreCase(ownerID))) {
+            throw new FactoryExistsThrowable("Factory " + ownerID + " already exists.");
         }
         return new TaskFactory(ownerID);
     }

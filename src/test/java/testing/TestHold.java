@@ -1,6 +1,5 @@
 package testing;
 
-import io.aquaticlabs.aquaticdata.data.object.DataObject;
 import io.aquaticlabs.aquaticdata.data.storage.CacheMode;
 import io.aquaticlabs.aquaticdata.data.storage.StorageHolder;
 import io.aquaticlabs.aquaticdata.data.storage.StorageMode;

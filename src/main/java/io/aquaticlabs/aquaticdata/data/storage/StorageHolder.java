@@ -11,6 +11,7 @@ import io.aquaticlabs.aquaticdata.data.tasks.AquaticRunnable;
 import io.aquaticlabs.aquaticdata.data.tasks.RepeatingTask;
 import io.aquaticlabs.aquaticdata.data.tasks.TaskFactory;
 import io.aquaticlabs.aquaticdata.data.type.DataCredential;
+import io.aquaticlabs.aquaticdata.data.type.mariadb.MariaDB;
 import io.aquaticlabs.aquaticdata.data.type.mysql.MySQLDB;
 import io.aquaticlabs.aquaticdata.data.type.sqlite.SQLiteDB;
 import io.aquaticlabs.aquaticdata.util.DataDebugLog;
@@ -680,7 +681,7 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
 
 
             if (needsAltering.get()) {
-                if (database instanceof MySQLDB) {
+                if (database instanceof MySQLDB || database instanceof MariaDB) {
                     List<String> batches = new ArrayList<>();
 
 
@@ -743,13 +744,23 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
 
                     String stmt1 = "ALTER TABLE " + database.getTable() + " RENAME TO " + tempTableName + ";";
                     DataDebugLog.logDebug(stmt1);
-
-                    try (PreparedStatement preparedStatement = conn.prepareStatement(stmt1)) {
-                        preparedStatement.executeQuery();
+                    PreparedStatement preparedStatement = conn.prepareStatement(stmt1);
+                    try {
+                        preparedStatement.executeUpdate();
                         DataDebugLog.logDebug("Success renaming table.");
 
                     } catch (Exception ex) {
+/*                        try {
+                            preparedStatement.executeQuery();
+                            DataDebugLog.logDebug("Success renaming table Second try using query.");
+
+                        }catch (Exception e) {
+                            DataDebugLog.logDebug("Failed to Alter Table. " + e.getMessage());
+                            conn.rollback();
+                            return null;
+                        }*/
                         DataDebugLog.logDebug("Failed to Alter Table. " + ex.getMessage());
+                        return null;
                     }
 
 
@@ -812,8 +823,8 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
                     }
 
                     String dropStmt = "DROP TABLE '" + tempTableName + "'";
-                    try (PreparedStatement preparedStatement = conn.prepareStatement(dropStmt)) {
-                        preparedStatement.executeUpdate();
+                    try (PreparedStatement dropStatement = conn.prepareStatement(dropStmt)) {
+                        dropStatement.executeUpdate();
 
                     } catch (Exception ex) {
                         DataDebugLog.logDebug("Failed to Drop temp Table. " + ex.getMessage());

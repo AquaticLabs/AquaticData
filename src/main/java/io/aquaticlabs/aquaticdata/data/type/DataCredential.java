@@ -52,6 +52,16 @@ public class DataCredential {
         return this;
     }
 
+    public DataCredential MariaDBCredential(String databaseName, String hostname, int port, String username, String password, String tableName) {
+        this.databaseName = databaseName;
+        this.hostname = hostname;
+        this.port = port;
+        this.username = username;
+        this.password = password;
+        this.tableName = tableName;
+        return this;
+    }
+
     public boolean test() {
         return false;
     }
