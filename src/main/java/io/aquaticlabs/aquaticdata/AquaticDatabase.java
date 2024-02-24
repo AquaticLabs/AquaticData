@@ -1,11 +1,11 @@
 package io.aquaticlabs.aquaticdata;
 
-import io.aquaticlabs.aquaticdata.data.tasks.TaskFactory;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.Setter;
 
 import java.util.function.Consumer;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
@@ -27,7 +27,7 @@ public class AquaticDatabase {
 
     public AquaticDatabase(@NonNull Consumer<Runnable> asyncRunner, @NonNull Consumer<Runnable> syncRunner, boolean debug, Logger logger) {
         if (instance != null) {
-            System.out.println("Already an Instance of DataLib");
+            logger.log(Level.WARNING, "Already an Instance of AquaticDatabase");
             return;
         }
         instance = this;
@@ -41,9 +41,4 @@ public class AquaticDatabase {
 
         return async ? asyncRunner : syncRunner;
     }
-
-    public static String getKey() {
-        return "DS5qX8MZC0Sxqb9e";
-    }
-
 }
