@@ -12,6 +12,7 @@ import io.aquaticlabs.aquaticdata.data.storage.queue.ConnectionRequest;
 import io.aquaticlabs.aquaticdata.data.type.DataCredential;
 import io.aquaticlabs.aquaticdata.util.DataDebugLog;
 
+import java.sql.PreparedStatement;
 import java.util.List;
 
 /**
@@ -186,6 +187,19 @@ public class MariaDB extends HikariCPDatabase {
     public void createTable(List<DataEntry<String, ColumnType>> columns, boolean force) {
         getConnectionQueue().addConnectionRequest(new ConnectionRequest<>(conn -> {
             conn.createStatement().executeUpdate(buildCreateTableSQL(columns, force));
+            return null;
+        }, AquaticDatabase.getInstance().getRunner(false)));
+    }
+
+    @Override
+    public void dropTable() {
+        executeNonLockConnection(new ConnectionRequest<>(conn -> {
+            String dropConflict = "DROP TABLE IF EXISTS " + dataCredential.getTableName() + ";";
+            try (PreparedStatement preparedStatement = conn.prepareStatement(dropConflict)) {
+                preparedStatement.executeUpdate();
+            } catch (Exception ex) {
+                DataDebugLog.logDebug("MariaDB Failed to drop if exists Table. " + ex.getMessage());
+            }
             return null;
         }, AquaticDatabase.getInstance().getRunner(false)));
     }

@@ -9,7 +9,7 @@ import java.util.ArrayList;
  * On: 4/10/2022
  * At: 19:33
  */
-public interface DataObject extends SerializableObject, Saveable {
+public interface DataObject extends SerializableObject {
 
     Object getKey();
 

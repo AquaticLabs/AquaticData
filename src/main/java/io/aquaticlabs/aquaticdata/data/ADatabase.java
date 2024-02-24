@@ -36,5 +36,6 @@ public abstract class ADatabase {
 
     public abstract void createTable(List<DataEntry<String, ColumnType>> columns, boolean force);
 
+    public abstract void dropTable();
 
 }

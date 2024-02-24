@@ -12,6 +12,7 @@ import io.aquaticlabs.aquaticdata.data.type.DataCredential;
 import io.aquaticlabs.aquaticdata.util.DataDebugLog;
 
 import java.io.File;
+import java.sql.PreparedStatement;
 import java.util.List;
 
 /**
@@ -175,6 +176,19 @@ public class SQLiteDB extends HikariCPDatabase {
     public void createTable(List<DataEntry<String, ColumnType>> columns, boolean force) {
         executeNonLockConnection(new ConnectionRequest<>(conn -> {
             conn.createStatement().executeUpdate(buildCreateTableSQL(columns, force));
+            return null;
+        }, AquaticDatabase.getInstance().getRunner(false)));
+    }
+
+    @Override
+    public void dropTable() {
+        executeNonLockConnection(new ConnectionRequest<>(conn -> {
+            String dropConflict = "DROP TABLE IF EXISTS " + dataCredential.getTableName() + ";";
+            try (PreparedStatement preparedStatement = conn.prepareStatement(dropConflict)) {
+                preparedStatement.executeUpdate();
+            } catch (Exception ex) {
+                DataDebugLog.logDebug("Sqlite Failed to drop if exists Table. " + ex.getMessage());
+            }
             return null;
         }, AquaticDatabase.getInstance().getRunner(false)));
     }

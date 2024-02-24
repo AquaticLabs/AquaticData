@@ -12,6 +12,7 @@ import io.aquaticlabs.aquaticdata.data.storage.queue.ConnectionRequest;
 import io.aquaticlabs.aquaticdata.data.type.DataCredential;
 import io.aquaticlabs.aquaticdata.util.DataDebugLog;
 
+import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.List;
 
@@ -190,5 +191,18 @@ public class MySQLDB extends HikariCPDatabase {
             return null;
         }, AquaticDatabase.getInstance().getRunner(false)));
     }
+    @Override
+    public void dropTable() {
+        executeNonLockConnection(new ConnectionRequest<>(conn -> {
+            String dropConflict = "DROP TABLE IF EXISTS " + dataCredential.getTableName() + ";";
+            try (PreparedStatement preparedStatement = conn.prepareStatement(dropConflict)) {
+                preparedStatement.executeUpdate();
+            } catch (Exception ex) {
+                DataDebugLog.logDebug("MySql Failed to drop if exists Table. " + ex.getMessage());
+            }
+            return null;
+        }, AquaticDatabase.getInstance().getRunner(false)));
+    }
+
 }
 
