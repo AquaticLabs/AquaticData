@@ -2,7 +2,7 @@ package io.aquaticlabs.aquaticdata.util;
 
 public class SQLVersion implements Comparable<SQLVersion> {
 
-    private String versionNumber;
+    private final String versionNumber;
 
     public SQLVersion(String versionNumber) {
         if (versionNumber == null)

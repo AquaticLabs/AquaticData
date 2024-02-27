@@ -82,71 +82,6 @@ public class StorageUtil {
         }
     }
 
-/*
-    public static JsonElement primitiveToString(Object object) {
-        if (object == null) return JsonNull.INSTANCE;
-        Class clazz = Primitives.wrap(object.getClass());
-        if (clazz == Integer.class) return new JsonPrimitive(object.toString());
-        else if (clazz == Double.class) return new JsonPrimitive(object.toString());
-        else if (clazz == Long.class) return new JsonPrimitive(object.toString());
-        else if (clazz == Float.class) return new JsonPrimitive(object.toString());
-        else if (clazz == Boolean.class)
-            return new JsonPrimitive((((Boolean) object) ? "1" : "0"));
-        else if (clazz == String.class) return new JsonPrimitive(object.toString());
-        else
-            throw new IllegalStateException(
-                    "Failed to serialize object of type " + object.getClass().getSimpleName());
-    }
-*/
-
-/*    public static JsonElement wrap(Object object) {
-        if (object == null) {
-            return JsonNull.INSTANCE;
-        }
-
-        // If primitive just convert to string
-        if (isPrimitive(object.getClass())) {
-            return primitiveToString(object);
-        }
-
-        // If implements SerializableObject, serialize
-        if (object instanceof SerializableObject) {
-            SerializedData serializedData = new SerializedData();
-            ((SerializableObject) object).serialize(serializedData);
-
-            return serializedData.getJsonElement();
-        }
-
-        // If is collection
-        if (object instanceof Collection) {
-            JsonArray array = new JsonArray();
-            for (Object listObject : (Collection) object) array.add(wrap(listObject));
-
-            return array;
-        }
-
-        // If is map
-        if (object instanceof Map) {
-            Map map = (Map) object;
-            JsonArray array = new JsonArray();
-            map.forEach(
-                    (key, value) -> {
-                        JsonObject jsonObject = new JsonObject();
-                        jsonObject.add("key", wrap(key));
-                        jsonObject.add("value", wrap(value));
-                        array.add(jsonObject);
-                    });
-            return array;
-        }
-
-        // If it's an enum
-        if (object.getClass().isEnum()) {
-            return new JsonPrimitive(((Enum) object).name());
-        }
-
-        return AquaticDatabase.getInstance().getGson().toJsonTree(object);
-    }*/
-
     public static String fromObject(Object object) {
         if (!(object instanceof String)) {
             if (object instanceof Boolean) {
@@ -175,9 +110,6 @@ public class StorageUtil {
 
         if (clazz.isEnum()) return (T) Enum.valueOf((Class<Enum>) clazz, object.toString());
 
-        if (object instanceof Boolean) {
-
-        }
 
         Object parsed = fromObject(object);
 

@@ -13,7 +13,6 @@ import io.aquaticlabs.aquaticdata.data.type.DataCredential;
 import io.aquaticlabs.aquaticdata.util.DataDebugLog;
 
 import java.sql.PreparedStatement;
-import java.sql.SQLException;
 import java.util.List;
 
 /**
@@ -145,7 +144,7 @@ public class MySQLDB extends HikariCPDatabase {
                 .append(key.getValue())
                 .append("';");
 
-        DataDebugLog.logDebug("MYSQL UPDATE STATEMENT: " + builder.toString());
+        DataDebugLog.logDebug("MYSQL UPDATE STATEMENT: " + builder);
 
         return builder.toString();
     }
@@ -178,7 +177,7 @@ public class MySQLDB extends HikariCPDatabase {
                 .append(columns.get(0).getKey())
                 .append(" ));");
 
-        DataDebugLog.logDebug("MYSQL TABLE CREATION: " + queryBuilder.toString());
+        DataDebugLog.logDebug("MYSQL TABLE CREATION: " + queryBuilder);
 
         return queryBuilder.toString();
     }

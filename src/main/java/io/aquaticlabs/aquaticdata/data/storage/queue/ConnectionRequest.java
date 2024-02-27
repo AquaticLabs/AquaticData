@@ -19,7 +19,7 @@ public class ConnectionRequest<T> {
     @Getter
     private final HikariCPDatabase.ConnectionCallback<T> request;
     @Getter
-    private List<Runnable> whenCompleteRunnables;
+    private final List<Runnable> whenCompleteRunnables;
 
     public ConnectionRequest(HikariCPDatabase.ConnectionCallback<T> request, Consumer<Runnable> runner) {
         this.request = request;

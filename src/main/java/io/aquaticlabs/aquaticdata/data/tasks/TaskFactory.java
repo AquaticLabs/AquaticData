@@ -43,7 +43,7 @@ public class TaskFactory {
     private final Map<Integer, AquaticTask> activeTasks = new HashMap<>();
 
     @Getter
-    private ScheduledExecutorService scheduledExecutorService;
+    private final ScheduledExecutorService scheduledExecutorService;
 
     private TaskFactory(String ownerID) {
         this.ownerID = ownerID;

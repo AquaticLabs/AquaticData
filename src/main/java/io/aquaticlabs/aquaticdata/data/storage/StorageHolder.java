@@ -61,7 +61,7 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
     @Getter
     private long cacheTimeInSecondsToSave = (60L * 5);
 
-    private int standardBatchSize = 250; // Adjust the batch size as needed
+    private final int standardBatchSize = 250; // Adjust the batch size as needed
 
     /**
      * The Time in Minutes data should timeout (only active when LOAD_AND_TIMEOUT storage mode is active)
@@ -222,7 +222,7 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
                         loadIntoCache(dumb, serializedData);
                         add(dumb);
                     } catch (Exception exception) {
-                        DataDebugLog.logDebug("Failed to deserialize class, with data: " + serializedData.toString());
+                        DataDebugLog.logDebug("Failed to deserialize class, with data: " + serializedData);
                         exception.printStackTrace();
                     }
                 }
@@ -710,11 +710,6 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
                         batches.add(alterStmt + " MODIFY COLUMN `" + retypeEntry.getKey() + "` " + retypeEntry.getValue().getSql() + " NOT NULL DEFAULT '0';");
                     }
 
- /*                   for (String s : batches) {
-                        System.out.println(s);
-                    }
-*/
-
                     try (Statement statement = conn.createStatement()) {
 
                         for (String batch : batches) {
@@ -750,15 +745,6 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
                         DataDebugLog.logDebug("Success renaming table.");
 
                     } catch (Exception ex) {
-/*                        try {
-                            preparedStatement.executeQuery();
-                            DataDebugLog.logDebug("Success renaming table Second try using query.");
-
-                        }catch (Exception e) {
-                            DataDebugLog.logDebug("Failed to Alter Table. " + e.getMessage());
-                            conn.rollback();
-                            return null;
-                        }*/
                         DataDebugLog.logDebug("Failed to Alter Table. " + ex.getMessage());
                         return null;
                     }

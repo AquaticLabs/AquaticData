@@ -144,7 +144,7 @@ public class MariaDB extends HikariCPDatabase {
                 .append(key.getValue())
                 .append("';");
 
-        DataDebugLog.logDebug("MARIADB UPDATE STATEMENT: " + builder.toString());
+        DataDebugLog.logDebug("MARIADB UPDATE STATEMENT: " + builder);
 
         return builder.toString();
     }
@@ -177,7 +177,7 @@ public class MariaDB extends HikariCPDatabase {
                 .append(columns.get(0).getKey())
                 .append(" ));");
 
-        DataDebugLog.logDebug("MARIADB TABLE CREATION: " + queryBuilder.toString());
+        DataDebugLog.logDebug("MARIADB TABLE CREATION: " + queryBuilder);
 
         return queryBuilder.toString();
     }

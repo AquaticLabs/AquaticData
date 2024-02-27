@@ -1,9 +1,7 @@
 package io.aquaticlabs.aquaticdata.util;
 
 import javax.crypto.Cipher;
-import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
-import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 
 
@@ -14,9 +12,11 @@ public class Crypto {
 
 
     public Crypto (String key) {
-        while (key.length() < 16) {
-            key += 'f';
+        StringBuilder keyBuilder = new StringBuilder(key);
+        while (keyBuilder.length() < 16) {
+            keyBuilder.append('f');
         }
+        key = keyBuilder.toString();
         if (key.length() > 16) {
             key = key.substring(0, 16);
         }

@@ -168,7 +168,7 @@ public class SQLiteDB extends HikariCPDatabase {
                     .append(" NOT NULL");
         }
         queryBuilder.append(") ");
-        DataDebugLog.logDebug("SQLITE TABLE CREATION: " + queryBuilder.toString());
+        DataDebugLog.logDebug("SQLITE TABLE CREATION: " + queryBuilder);
         return queryBuilder.toString();
     }
 
