@@ -208,10 +208,12 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
             ArrayList<DataEntry<String, ColumnType>> structure = dummy.getStructure();
 
             try (ResultSet rs = conn.createStatement().executeQuery("SELECT * FROM " + database.getTable())) {
+                int column = 1;
                 while (rs.next()) {
-                    List<DataEntry<String, Object>> data = new LinkedList<>();
+                    List<ObjectValue> data = new LinkedList<>();
                     for (DataEntry<String, ColumnType> entry : structure) {
-                        data.add(new DataEntry<>(entry.getKey(), rs.getObject(entry.getKey())));
+                        data.add(new ObjectValue(entry.getKey(), rs.getObject(entry.getKey()), ColumnType.matchType(rs.getMetaData().getColumnTypeName(column))));
+                        column++;
                     }
                     SerializedData serializedData = new SerializedData();
                     serializedData.fromQuery(data);
@@ -250,11 +252,13 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
 
 
             try (ResultSet rs = conn.createStatement().executeQuery("SELECT * FROM " + database.getTable() + " WHERE " + key.getKey() + " = '" + key.getValue() + "'")) {
-                int i = 1;
-                List<DataEntry<String, Object>> data = new LinkedList<>();
+                int column = 1;
+                List<ObjectValue> data = new LinkedList<>();
                 for (DataEntry<String, ColumnType> entry : structure) {
-                    data.add(new DataEntry<>(entry.getKey(), rs.getObject(i)));
-                    i++;
+                    //data.add(new DataEntry<>(entry.getKey(), rs.getObject(column)));
+                    data.add(new ObjectValue(entry.getKey(), rs.getObject(column), ColumnType.matchType(rs.getMetaData().getColumnTypeName(column))));
+
+                    column++;
                 }
 
                 DataDebugLog.logDebug("SELECT * FROM " + database.getTable() + " WHERE " + key.getKey() + " = '" + key.getValue() + "'");
@@ -302,11 +306,12 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
             }
             try (ResultSet rs = conn.createStatement().executeQuery("SELECT * FROM " + database.getTable() + " WHERE " + key.getKey() + " = '" + key.getValue() + "'")) {
                 rs.next();
-                int i = 1;
-                List<DataEntry<String, Object>> data = new LinkedList<>();
+                int column = 1;
+                List<ObjectValue> data = new LinkedList<>();
                 for (DataEntry<String, ColumnType> entry : structure) {
-                    data.add(new DataEntry<>(entry.getKey(), rs.getObject(i)));
-                    i++;
+                    data.add(new ObjectValue(entry.getKey(), rs.getObject(column), ColumnType.matchType(rs.getMetaData().getColumnTypeName(column))));
+
+                    column++;
                 }
                 SerializedData serializedData = new SerializedData();
                 serializedData.fromQuery(data);
@@ -650,7 +655,7 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
                     dataMirrorArray.add(addAtInt, colName);
                 }
 
-                StorageUtil.calculateMoves(moveColumns, dataMirrorArray,structureColumns);
+                StorageUtil.calculateMoves(moveColumns, dataMirrorArray, structureColumns);
                 if (!moveColumns.isEmpty()) {
                     needsAltering.set(true);
                 }
@@ -764,16 +769,18 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
 
                         while (rs.next()) {
 
-                            List<DataEntry<String, Object>> data = new LinkedList<>();
+                            List<ObjectValue> data = new LinkedList<>();
 
+                            int column = 1;
                             for (DataEntry<String, ColumnType> entry : structure) {
                                 try {
                                     rs.findColumn(entry.getKey());
                                 } catch (SQLException sql) {
-                                    data.add(new DataEntry<>(entry.getKey(), object.getDefaultDataValue(entry.getKey())));
+                                    data.add(new ObjectValue(entry.getKey(), object.getDefaultDataValue(entry.getKey()), ColumnType.matchType(rs.getMetaData().getColumnTypeName(column))));
                                     continue;
                                 }
-                                data.add(new DataEntry<>(entry.getKey(), rs.getObject(entry.getKey())));
+                                data.add(new ObjectValue(entry.getKey(), rs.getObject(entry.getKey()), ColumnType.matchType(rs.getMetaData().getColumnTypeName(column))));
+                                column++;
                             }
 
                             SerializedData serializedData = new SerializedData();
@@ -836,8 +843,6 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
 
         }));
     }
-
-
 
 
     private T construct() {

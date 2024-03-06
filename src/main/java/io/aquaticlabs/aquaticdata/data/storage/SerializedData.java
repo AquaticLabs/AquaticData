@@ -19,9 +19,12 @@ public class SerializedData {
 
     @Getter
     private final HashMap<String, Object> values;
+    @Getter
+    private final HashMap<String, ColumnType> valueTypes;
 
     public SerializedData() {
         this.values = new HashMap<>();
+        this.valueTypes = new HashMap<>();
     }
 
     public <T> T applyAs(String key, Class<T> castingClass, Supplier<T> defaultValue) {
@@ -34,6 +37,9 @@ public class SerializedData {
         return applyAs(field, clazz, null);
     }
 
+    public ColumnType getColumnType(String field) {
+        return valueTypes.get(field);
+    }
 
 
     public Optional<Object> getValue(String field) {
@@ -47,9 +53,10 @@ public class SerializedData {
         values.put(field, object);
     }
 
-    public SerializedData fromQuery(List<DataEntry<String, Object>> objectValues) {
-        for (DataEntry<String, Object> objectValue : objectValues) {
-            write(objectValue.getKey(), objectValue.getValue());
+    public SerializedData fromQuery(List<ObjectValue> objectValues) {
+        for (ObjectValue objectValue : objectValues) {
+            write(objectValue.getField(), objectValue.getValue());
+            valueTypes.put(objectValue.getField(),objectValue.getColumnType());
         }
         return this;
     }

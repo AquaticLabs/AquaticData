@@ -8,6 +8,7 @@ import io.aquaticlabs.aquaticdata.data.tasks.TaskFactory;
 import io.aquaticlabs.aquaticdata.data.type.DataCredential;
 import io.aquaticlabs.aquaticdata.util.DataDebugLog;
 
+import java.io.File;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -25,12 +26,12 @@ public class TestMain {
     public static void main(String[] args) {
         AquaticDatabase aquaticDatabase = new AquaticDatabase(CompletableFuture::runAsync, Runnable::run, true, Logger.getLogger("AqLabs"));
 
-        //DataCredential sqlite = new DataCredential().SQLiteCredential(new File("G:\\Projects\\DataStuff"), "testDataConfirmTables", "testDataConfirmTables");
-        DataCredential mariaDB = new DataCredential().MariaDBCredential("testtable", "localhost", 3306, "root","password","testingMariaDB");
+        DataCredential sqlite = new DataCredential().SQLiteCredential(new File("G:\\Projects\\DataStuff"), "testDataConfirmTables", "testDataConfirmTables");
+        //DataCredential mariaDB = new DataCredential().MariaDBCredential("testtable", "localhost", 3306, "root", "password", "testingMariaDB");
 
-        testHold = new TestHold(mariaDB);
+        testHold = new TestHold(sqlite);
 
-        //TestData testData = testHold.getOrInsert(new TestData(UUID.fromString("269d4132-8758-458f-9087-344325ee14cf"), "Rod", 42));
+        TestData testData = testHold.getOrInsert(new TestData(UUID.fromString("269d4132-8758-458f-9087-344325ee14cf"), "Rod", 42));
         //testHold.saveSingle(testData,true);
 /*        TestData testData2 = testHold.getOrInsert(new TestData(UUID.randomUUID(), "Shod", 11));
         TestData testData3 = testHold.getOrInsert(new TestData(UUID.randomUUID(), "Brodd", 24));
