@@ -7,6 +7,8 @@ import io.aquaticlabs.aquaticdata.data.HikariCPDatabase;
 import io.aquaticlabs.aquaticdata.data.object.DataEntry;
 import io.aquaticlabs.aquaticdata.data.object.DataObject;
 import io.aquaticlabs.aquaticdata.data.storage.ColumnType;
+import io.aquaticlabs.aquaticdata.data.storage.Storage;
+import io.aquaticlabs.aquaticdata.data.storage.StorageHolder;
 import io.aquaticlabs.aquaticdata.data.storage.queue.ConnectionRequest;
 import io.aquaticlabs.aquaticdata.data.type.DataCredential;
 import io.aquaticlabs.aquaticdata.util.DataDebugLog;
@@ -23,12 +25,12 @@ import java.util.List;
 public class SQLiteDB extends HikariCPDatabase {
 
     private final DataCredential dataCredential;
-    private final DataObject object;
+    private final Storage<?> holder;
 
-    public SQLiteDB(DataCredential dataCredential, DataObject object) {
+    public SQLiteDB(DataCredential dataCredential, Storage<?> holder) {
         super(dataCredential.getTableName());
         this.dataCredential = dataCredential;
-        this.object = object;
+        this.holder = holder;
 
         HikariConfig config = new HikariConfig();
         config.setPoolName("Aquatic Labs Sqlite Pool");
@@ -43,13 +45,11 @@ public class SQLiteDB extends HikariCPDatabase {
 
         setHikariDataSource(new HikariDataSource(config));
 
-        verifyTable(object.getStructure());
-
     }
 
     @Override
     public String insertStatement(List<DataEntry<String, String>> columns) {
-        List<DataEntry<String, ColumnType>> col = object.getStructure();
+        List<DataEntry<String, ColumnType>> col = holder.getStructure();
 
 
         StringBuilder builder = new StringBuilder();
@@ -100,7 +100,7 @@ public class SQLiteDB extends HikariCPDatabase {
     public String buildUpdateStatementSQL(List<DataEntry<String, String>> columns) {
 
         DataEntry<String, String> key = columns.get(0);
-        List<DataEntry<String, ColumnType>> structure = object.getStructure();
+        List<DataEntry<String, ColumnType>> structure = holder.getStructure();
 
         StringBuilder builder = new StringBuilder();
         builder
@@ -139,7 +139,8 @@ public class SQLiteDB extends HikariCPDatabase {
     }
 
 
-    private void verifyTable(List<DataEntry<String, ColumnType>> columns) {
+    @Override
+    public void verifyTableExists(List<DataEntry<String, ColumnType>> columns) {
         createTable(columns, false);
     }
 

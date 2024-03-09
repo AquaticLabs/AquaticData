@@ -1,12 +1,16 @@
 package testing;
 
+import io.aquaticlabs.aquaticdata.data.object.DataEntry;
 import io.aquaticlabs.aquaticdata.data.storage.CacheMode;
+import io.aquaticlabs.aquaticdata.data.storage.ColumnType;
 import io.aquaticlabs.aquaticdata.data.storage.StorageHolder;
 import io.aquaticlabs.aquaticdata.data.storage.StorageMode;
 import io.aquaticlabs.aquaticdata.data.type.DataCredential;
 import lombok.Getter;
 
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -38,6 +42,17 @@ public class TestHold extends StorageHolder<TestData> {
         add(dataObj, persistent);
         return dataObj;
     }
+
+    @Override
+    public List<DataEntry<String, ColumnType>> getStructure() {
+        ArrayList<DataEntry<String, ColumnType>> structure = new ArrayList<>();
+        structure.add(new DataEntry<>("uuid", ColumnType.VARCHAR_UUID));
+        structure.add(new DataEntry<>("name", ColumnType.VARCHAR));
+        structure.add(new DataEntry<>("level", ColumnType.INT));
+        structure.add(new DataEntry<>("stat1", ColumnType.INT));
+        structure.add(new DataEntry<>("stat2", ColumnType.INT));
+        structure.add(new DataEntry<>("stat3", ColumnType.INT));
+        return structure;    }
 
     public TestData getOrInsert(TestData dataObj) {
         return getOrInsert(dataObj, true);

@@ -1,6 +1,7 @@
 package io.aquaticlabs.aquaticdata.data.storage;
 
 import io.aquaticlabs.aquaticdata.data.cache.ModelCachedData;
+import io.aquaticlabs.aquaticdata.data.object.DataEntry;
 import io.aquaticlabs.aquaticdata.data.object.DataObject;
 import io.aquaticlabs.aquaticdata.util.ConstuctorFailThrowable;
 import lombok.AccessLevel;
@@ -8,6 +9,7 @@ import lombok.Getter;
 
 import java.lang.reflect.Constructor;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -28,7 +30,7 @@ public abstract class Storage<T extends DataObject> implements Iterable<T> {
     @Getter(value = AccessLevel.PROTECTED)
     private final Map<String, ModelCachedData> dataCache = new ConcurrentHashMap<>();
 
-
+    public abstract List<DataEntry<String, ColumnType>> getStructure();
 
     public void addVariant(String variant, Class<T> clazz) {
         variants.put(variant, clazz);

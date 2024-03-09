@@ -42,6 +42,9 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
 
     @Getter
     private ADatabase database;
+
+    private DataCredential dataCredential;
+
     private Class<T> clazz;
     @Getter
     @Setter
@@ -72,17 +75,12 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
 
 
     protected StorageHolder(DataCredential dataCredential, Class<T> clazz, StorageMode storageMode, CacheMode cacheMode) {
-        T t;
-        try {
-            t = constructorOf(clazz).newInstance();
-        } catch (Exception c) {
-            c.printStackTrace();
-            DataDebugLog.logError("FAILED TO CREATE DUMMY (" + clazz.getName() + ") OBJECT. STOPPING BOOTUP!");
-            return;
-        }
 
-        this.database = dataCredential.build(t);
+        this.dataCredential = dataCredential;
+        this.database = dataCredential.build(this);
+
         this.clazz = clazz;
+        this.cacheMode = cacheMode;
 
         String splitName = clazz.getName().split("\\.")[clazz.getName().split("\\.").length - 1];
         this.taskFactory = TaskFactory.getOrNew("StorageHolder<T>(" + splitName + ") Factory");
@@ -90,11 +88,25 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
         addVariant(this.database.getTable(), clazz);
         initStorageMode(storageMode);
 
-
-        confirmTable(t, true);
-
-        initCacheMode(cacheMode);
     }
+
+
+    public void initiateFirstLoad(boolean async) {
+
+        T classDummy;
+        try {
+            classDummy = constructorOf(clazz).newInstance();
+        } catch (Exception c) {
+            c.printStackTrace();
+            DataDebugLog.logError("FAILED TO CREATE DUMMY (" + clazz.getName() + ") OBJECT. STOPPING BOOTUP!");
+            return;
+        }
+        confirmTable(classDummy, true);
+        loadAll(async);
+        initCacheMode(cacheMode);
+
+    }
+
 
 
     protected void initStorageMode(StorageMode storageMode) {
@@ -119,7 +131,6 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
     }
 
     private void initCacheMode(CacheMode cacheMode, long saveInterval) {
-        this.cacheMode = cacheMode;
         cacheTimeInSecondsToSave = saveInterval;
         if (cacheMode == CacheMode.TIME) {
             cacheSaveTask = getTaskFactory().createRepeatingTask(new AquaticRunnable() {
@@ -177,7 +188,7 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
 
     private void loadIntoCache(T object, SerializedData data) {
         ModelCachedData cache = getDataCache().computeIfAbsent(object.getKey().toString(), key -> new ModelCachedData());
-        for (DataEntry<String, String> entryList : data.toColumnList(object.getStructure())) {
+        for (DataEntry<String, String> entryList : data.toColumnList(getStructure())) {
             String column = entryList.getKey();
             String value = entryList.getValue();
             cache.add(column, value);
@@ -205,12 +216,12 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
                 DataDebugLog.logDebug("Failed to Construct <T>(" + clazz.getName() + ") Class");
                 return null;
             }
-            ArrayList<DataEntry<String, ColumnType>> structure = dummy.getStructure();
+            List<DataEntry<String, ColumnType>> structure = getStructure();
 
             try (ResultSet rs = conn.createStatement().executeQuery("SELECT * FROM " + database.getTable())) {
-                int column = 1;
                 while (rs.next()) {
                     List<ObjectValue> data = new LinkedList<>();
+                    int column = 1;
                     for (DataEntry<String, ColumnType> entry : structure) {
                         data.add(new ObjectValue(entry.getKey(), rs.getObject(entry.getKey()), ColumnType.matchType(rs.getMetaData().getColumnTypeName(column))));
                         column++;
@@ -248,7 +259,7 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
             }
 
             T dummy = construct(clazz);
-            ArrayList<DataEntry<String, ColumnType>> structure = dummy.getStructure();
+            List<DataEntry<String, ColumnType>> structure = getStructure();
 
 
             try (ResultSet rs = conn.createStatement().executeQuery("SELECT * FROM " + database.getTable() + " WHERE " + key.getKey() + " = '" + key.getValue() + "'")) {
@@ -293,7 +304,7 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
             DataDebugLog.logDebug("Failed to Construct <T>(" + clazz.getName() + ") Class");
             return null;
         }
-        ArrayList<DataEntry<String, ColumnType>> structure = t.getStructure();
+        List<DataEntry<String, ColumnType>> structure = getStructure();
         T dummy = construct();
 
         if (dummy == null) {
@@ -345,7 +356,7 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
 
                 SerializedData data = new SerializedData();
                 object.serialize(data);
-                List<DataEntry<String, String>> columnList = data.toColumnList(object.getStructure());
+                List<DataEntry<String, String>> columnList = data.toColumnList(getStructure());
 
                 List<DataEntry<String, String>> needsUpdate = buildNeedsUpdate(object, data);
                 if (needsUpdate.isEmpty()) {
@@ -396,7 +407,7 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
 
                         SerializedData data = new SerializedData();
                         object.serialize(data);
-                        List<DataEntry<String, String>> columnList = data.toColumnList(object.getStructure());
+                        List<DataEntry<String, String>> columnList = data.toColumnList(getStructure());
 
                         List<DataEntry<String, String>> needsUpdate = buildNeedsUpdate(object, data);
                         if (needsUpdate.isEmpty()) {
@@ -462,7 +473,7 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
         ModelCachedData cache = getDataCache().computeIfAbsent(object.getKey().toString(), key -> new ModelCachedData());
 
         List<DataEntry<String, String>> needsUpdate = new ArrayList<>();
-        for (DataEntry<String, String> entryList : data.toColumnList(object.getStructure())) {
+        for (DataEntry<String, String> entryList : data.toColumnList(getStructure())) {
             String columnName = entryList.getKey();
             String value = entryList.getValue();
 
@@ -485,7 +496,7 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
         if (needsUpdate.isEmpty()) {
             return needsUpdate;
         }
-        String key = object.getStructure().get(0).getKey();
+        String key = getStructure().get(0).getKey();
         String existingKey = needsUpdate.get(0).getKey();
         if (!existingKey.equalsIgnoreCase(key)) {
             Optional<Object> value = data.getValue(key);
@@ -502,7 +513,7 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
         // Column, Data
         List<DataEntry<String, String>> needsUpdate = new ArrayList<>();
 
-        for (DataEntry<String, String> entryList : data.toColumnList(object.getStructure())) {
+        for (DataEntry<String, String> entryList : data.toColumnList(getStructure())) {
             String column = entryList.getKey();
             String value = entryList.getValue();
 
@@ -521,7 +532,7 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
             DataDebugLog.logDebug("Needs update is empty. no need for updating");
             return;
         }
-        String key = object.getStructure().get(0).getKey();
+        String key = getStructure().get(0).getKey();
         String existingKey = needsUpdate.get(0).getKey();
         if (!existingKey.equalsIgnoreCase(key)) {
             Optional<Object> value = data.getValue(key);
@@ -531,7 +542,7 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
 
         database.getConnectionQueue().addConnectionRequest(new ConnectionRequest<>(conn -> {
 
-            List<DataEntry<String, String>> columnList = data.toColumnList(object.getStructure());
+            List<DataEntry<String, String>> columnList = data.toColumnList(getStructure());
 
             if (doesEntryExist(conn, columnList.get(0))) {
 
@@ -581,6 +592,9 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
 
 
     public void confirmTable(T object, boolean async) {
+
+        database.verifyTableExists(getStructure());
+
         Consumer<Runnable> runner = AquaticDatabase.getInstance().getRunner(async);
         String tempTableName = "AquaticDataTempTable";
         DataDebugLog.logDebug("confirm table?");
@@ -595,13 +609,13 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
         database.executeNonLockConnection(new ConnectionRequest<>(conn -> {
 
             Map<String, DataEntry<String, ColumnType>> structureMap = new LinkedHashMap<>();
-            for (DataEntry<String, ColumnType> entry : object.getStructure()) {
+            for (DataEntry<String, ColumnType> entry : getStructure()) {
                 structureMap.put(entry.getKey(), entry);
             }
 
             try {
 
-                List<String> structureColumns = object.getStructure().stream().map(DataEntry::getKey).collect(Collectors.toList());
+                List<String> structureColumns = getStructure().stream().map(DataEntry::getKey).collect(Collectors.toList());
 
                 DatabaseMetaData metaData = conn.getMetaData();
                 ResultSet result = metaData.getColumns(null, null, database.getTable(), null);
@@ -622,7 +636,7 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
 
 
                 int addCurrent = 0;
-                for (DataEntry<String, ColumnType> entry : object.getStructure()) {
+                for (DataEntry<String, ColumnType> entry : getStructure()) {
                     if (!databaseColumns.containsKey(entry.getKey())) {
                         addColumns.put(structureColumns.get(addCurrent - 1), entry);
                         needsAltering.set(true);
@@ -755,7 +769,7 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
                     }
 
 
-                    ArrayList<DataEntry<String, ColumnType>> structure = object.getStructure();
+                    List<DataEntry<String, ColumnType>> structure = getStructure();
                     database.createTable(structure, true);
                     DataDebugLog.logDebug("copy");
 
@@ -788,7 +802,7 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
                             assert dummy != null;
                             dummy.deserialize(serializedData);
 
-                            String insertStatement = database.insertStatement(serializedData.toColumnList(dummy.getStructure()));
+                            String insertStatement = database.insertStatement(serializedData.toColumnList(getStructure()));
                             statement.addBatch(insertStatement);
                             count++;
 

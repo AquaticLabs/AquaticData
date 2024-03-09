@@ -15,6 +15,4 @@ public interface DataObject extends SerializableObject {
 
     Object getDefaultDataValue(String columnName);
 
-    ArrayList<DataEntry<String, ColumnType>> getStructure();
-
 }

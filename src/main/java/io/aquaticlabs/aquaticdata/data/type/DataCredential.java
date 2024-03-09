@@ -2,11 +2,14 @@ package io.aquaticlabs.aquaticdata.data.type;
 
 import io.aquaticlabs.aquaticdata.data.ADatabase;
 import io.aquaticlabs.aquaticdata.data.object.DataObject;
+import io.aquaticlabs.aquaticdata.data.storage.Storage;
+import io.aquaticlabs.aquaticdata.data.type.mariadb.MariaDB;
 import io.aquaticlabs.aquaticdata.data.type.mysql.MySQLDB;
 import io.aquaticlabs.aquaticdata.data.type.sqlite.SQLiteDB;
 import lombok.Getter;
 import lombok.Setter;
 
+import javax.xml.ws.Holder;
 import java.io.File;
 
 /**
@@ -14,7 +17,8 @@ import java.io.File;
  * On: 8/21/2022
  * At: 23:34
  */
-@Getter @Setter
+@Getter
+@Setter
 public class DataCredential {
 
     private String databaseName;
@@ -26,6 +30,7 @@ public class DataCredential {
     private boolean allowPublicKeyRetrieval = true;
     private String tableName;
     private File folder;
+    private CredentialType credentialType;
 
 
     public DataCredential() {
@@ -38,6 +43,7 @@ public class DataCredential {
         this.username = username;
         this.password = password;
         this.tableName = tableName;
+        this.credentialType = CredentialType.MYSQL;
         return this;
     }
 
@@ -45,6 +51,7 @@ public class DataCredential {
         this.folder = folder;
         this.databaseName = databaseName;
         this.tableName = tableName;
+        this.credentialType = CredentialType.SQLITE;
         return this;
     }
 
@@ -55,16 +62,20 @@ public class DataCredential {
         this.username = username;
         this.password = password;
         this.tableName = tableName;
+        this.credentialType = CredentialType.MARIADB;
         return this;
     }
 
-    public ADatabase build(DataObject object) {
+    public ADatabase build(Storage<?> holder) {
+        switch (credentialType) {
+            case MYSQL:
+                return new MySQLDB(this, holder);
+            case MARIADB:
+                return new MariaDB(this, holder);
+            default:
+                return new SQLiteDB(this, holder);
 
-        if (password != null) {
-            return new MySQLDB(this, object);
         }
-        return new SQLiteDB(this, object);
-
     }
 
     public DataCredential databaseName(String databaseName) {
@@ -96,6 +107,7 @@ public class DataCredential {
         this.tableName = tableName;
         return this;
     }
+
     public DataCredential folder(File folder) {
         this.folder = folder;
         if (!folder.exists()) folder.mkdirs();
