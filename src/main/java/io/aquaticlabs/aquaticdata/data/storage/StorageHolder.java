@@ -482,15 +482,9 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
                 DataDebugLog.logDebug("Needs Update: " + columnName + " " + value);
                 continue;
             }
-
-            // DataDebugLog.logDebug("Cache Details: " + columnName + " Cache Value Hash: " + cache.getCache().get(columnName) + " New Value Hash: " + cache.hashString(value));
-
             if (!cache.isOutdated(columnName, value)) {
-                // DataDebugLog.logDebug("Cache Is Up to date: " + columnName + " " + value);
                 continue;
             }
-
-            // DataDebugLog.logDebug("Cache Is Outdated... Needs Update: " + columnName + " Value: " + value);
             needsUpdate.add(new DataEntry<>(columnName, value));
         }
         if (needsUpdate.isEmpty()) {
@@ -899,6 +893,7 @@ public abstract class StorageHolder<T extends DataObject> extends Storage<T> {
 
 
     @SneakyThrows
+    @SuppressWarnings("unchecked")
     public <B extends T> B construct(Class<B> clazz) {
         return (B) getConstructorMap()
                 .computeIfAbsent(

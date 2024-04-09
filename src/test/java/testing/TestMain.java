@@ -1,6 +1,8 @@
 package testing;
 
 import io.aquaticlabs.aquaticdata.AquaticDatabase;
+import io.aquaticlabs.aquaticdata.data.object.DataEntry;
+import io.aquaticlabs.aquaticdata.data.storage.ColumnType;
 import io.aquaticlabs.aquaticdata.data.storage.queue.ConnectionRequest;
 import io.aquaticlabs.aquaticdata.data.tasks.AquaticRunnable;
 import io.aquaticlabs.aquaticdata.data.tasks.RepeatingTask;
@@ -9,6 +11,7 @@ import io.aquaticlabs.aquaticdata.data.type.DataCredential;
 import io.aquaticlabs.aquaticdata.util.DataDebugLog;
 
 import java.io.File;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -24,6 +27,8 @@ public class TestMain {
     public static TestHold testHold;
 
     public static void main(String[] args) {
+        System.out.println(new File("resources").toPath());
+
         AquaticDatabase aquaticDatabase = new AquaticDatabase(CompletableFuture::runAsync, Runnable::run, true, Logger.getLogger("AqLabs"));
 
         DataCredential sqlite = new DataCredential().SQLiteCredential(new File("G:\\Projects\\DataStuff"), "testDataConfirmTables", "testDataConfirmTables");
@@ -31,7 +36,11 @@ public class TestMain {
 
         testHold = new TestHold(sqlite);
 
+
+        System.out.println(buildCreateTableSQL(testHold.getStructure(),false));
+
         TestData testData = testHold.getOrInsert(new TestData(UUID.fromString("269d4132-8758-458f-9087-344325ee14cf"), "Rod", 42));
+
         //testHold.saveSingle(testData,true);
 /*        TestData testData2 = testHold.getOrInsert(new TestData(UUID.randomUUID(), "Shod", 11));
         TestData testData3 = testHold.getOrInsert(new TestData(UUID.randomUUID(), "Brodd", 24));
@@ -106,5 +115,30 @@ public class TestMain {
         testHold.shutdown();
 
     }
+    private static String buildCreateTableSQL(List<DataEntry<String, ColumnType>> columns, boolean force) {
+        StringBuilder queryBuilder = new StringBuilder();
+        queryBuilder.append("CREATE TABLE ");
+        if (!force) {
+            queryBuilder.append("IF NOT EXISTS ");
+        }
+        queryBuilder
+                .append("testtable")
+                .append(" (");
 
+        for (int i = 0; i < columns.size(); i++) {
+            DataEntry<String, ColumnType> column = columns.get(i);
+            queryBuilder.append(column.getKey()).append(" ").append(column.getValue().getSql()); // maybe add not null?
+            if (i != columns.size() - 1) {
+                queryBuilder.append(", ");
+            }
+        }
+        queryBuilder
+                .append(", PRIMARY KEY ( ")
+                .append(columns.get(0).getKey())
+                .append(" ));");
+
+        DataDebugLog.logDebug("MYSQL TABLE CREATION: " + queryBuilder);
+
+        return queryBuilder.toString();
+    }
 }

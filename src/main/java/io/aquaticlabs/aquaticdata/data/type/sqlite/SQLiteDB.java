@@ -134,7 +134,7 @@ public class SQLiteDB extends HikariCPDatabase {
 
         DataDebugLog.logDebug(builder.toString());
 
-        // UPDATE TABLE SET row=value, row2=value, row3=value WHERE primaryKeyColumn='primaryKey';
+        // UPDATE tablename SET row=value, row2=value, row3=value WHERE primaryKeyColumn='primaryKey';
         return builder.toString();
     }
 

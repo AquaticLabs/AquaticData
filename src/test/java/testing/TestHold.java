@@ -52,7 +52,10 @@ public class TestHold extends StorageHolder<TestData> {
         structure.add(new DataEntry<>("stat1", ColumnType.INT));
         structure.add(new DataEntry<>("stat2", ColumnType.INT));
         structure.add(new DataEntry<>("stat3", ColumnType.INT));
-        return structure;    }
+        structure.add(new DataEntry<>("stat4", ColumnType.INT));
+        return structure;
+    }
+
 
     public TestData getOrInsert(TestData dataObj) {
         return getOrInsert(dataObj, true);

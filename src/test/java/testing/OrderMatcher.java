@@ -1,6 +1,10 @@
 package testing;
 
 
+import io.aquaticlabs.aquaticdata.data.object.DataEntry;
+import io.aquaticlabs.aquaticdata.data.storage.ColumnType;
+import io.aquaticlabs.aquaticdata.util.DataDebugLog;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -11,6 +15,15 @@ import java.util.Map;
 public class OrderMatcher {
 
     public static void main(String[] args) {
+
+        StringBuilder builder = new StringBuilder();
+
+        builder.append("Test, ");
+
+        builder.deleteCharAt(builder.toString().length() - 2);
+        System.out.println(builder);
+
+
         ArrayList<String> desiredOrder = new ArrayList<>(Arrays.asList("UUID", "Name", "val1", "val2", "val3", "val4", "val5"));
 
 
