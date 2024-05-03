@@ -1,7 +1,7 @@
 package io.aquaticlabs.aquaticdata;
 
-import io.aquaticlabs.aquaticdata.data.object.DataEntry;
 import io.aquaticlabs.aquaticdata.type.sql.SQLColumnType;
+import io.aquaticlabs.aquaticdata.util.DataEntry;
 import lombok.Getter;
 
 import java.util.LinkedHashMap;

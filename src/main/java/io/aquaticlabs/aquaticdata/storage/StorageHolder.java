@@ -13,7 +13,10 @@ package io.aquaticlabs.aquaticdata.storage;
 
 import io.aquaticlabs.aquaticdata.Database;
 import io.aquaticlabs.aquaticdata.model.StorageModel;
+import io.aquaticlabs.aquaticdata.tasks.AquaticRunnable;
+import io.aquaticlabs.aquaticdata.tasks.TaskFactory;
 import io.aquaticlabs.aquaticdata.type.DataCredential;
+import io.aquaticlabs.aquaticdata.util.DataDebugLog;
 import io.aquaticlabs.aquaticdata.util.DataEntry;
 import lombok.NonNull;
 
@@ -32,12 +35,17 @@ public abstract class StorageHolder<K, T extends StorageModel> extends Storage<K
 
     protected StorageHolder(DataCredential dataCredential, Class<K> keyClazz, Class<T> clazz, @NonNull Executor asyncExecutor, @NonNull Executor syncExecutor) {
         setKeyClass(keyClazz);
+
+        String splitName = keyClazz.getName().split("\\.")[keyClazz.getName().split("\\.").length - 1];
+        setTaskFactory(TaskFactory.getOrNew("StorageHolder<T>(" + splitName + ") Factory"));
+
         this.database = dataCredential.build(getStructure(), createSerializer(), asyncExecutor, syncExecutor);
         database.addVariant(dataCredential.getTableName(), clazz);
     }
 
     protected void loadDatabase() {
         database.start(this);
+        initCacheMode(getca);
     }
 
     public void shutdown() {
@@ -56,7 +64,22 @@ public abstract class StorageHolder<K, T extends StorageModel> extends Storage<K
 
     @Override
     public void invalidateCacheEntryIfMode(T object) {
-        // not implemented
+        if (getStorageMode() == StorageMode.LOAD_AND_TIMEOUT) {
+            getTemporaryDataCache().getDataCache().invalidate(object);
+        }
+    }
+
+    private void initCacheMode(CacheMode cacheMode, long saveInterval) {
+        setCacheSaveTime(saveInterval);
+        if (cacheMode == CacheMode.TIME) {
+            cacheSaveTask = getTaskFactory().createRepeatingTask(new AquaticRunnable() {
+                @Override
+                public void run() {
+                    saveLoaded(true).whenComplete((users, t) -> DataDebugLog.logDebug("Cache Saved"));
+                    DataDebugLog.logDebug("TaskID: " + getTaskId() + " Task Owner: " + getOwnerID());
+                }
+            }, getCacheTimeInSecondsToSave());
+        }
     }
 
     protected CompletableFuture<List<T>> saveLoaded(boolean async) {
@@ -76,6 +99,6 @@ public abstract class StorageHolder<K, T extends StorageModel> extends Storage<K
     }
 
     protected CompletableFuture<List<T>> loadAll(boolean async) {
-       return database.loadAll(this, async);
+        return database.loadAll(this, async);
     }
 }

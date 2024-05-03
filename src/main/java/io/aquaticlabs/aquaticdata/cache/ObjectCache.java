@@ -4,8 +4,8 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalCause;
 import com.google.common.cache.RemovalListener;
-import io.aquaticlabs.aquaticdata.data.object.DataObject;
-import io.aquaticlabs.aquaticdata.data.storage.Storage;
+import io.aquaticlabs.aquaticdata.model.StorageModel;
+import io.aquaticlabs.aquaticdata.storage.Storage;
 import io.aquaticlabs.aquaticdata.util.DataDebugLog;
 
 import java.util.concurrent.TimeUnit;
@@ -15,13 +15,13 @@ import java.util.concurrent.TimeUnit;
  * On: 8/25/2022
  * At: 19:07
  */
-public class ObjectCache<V extends DataObject> {
+public class ObjectCache<K, T extends StorageModel> {
 
-    private final Storage<V> holder;
+    private final Storage<K, T> holder;
 
-    private final Cache<Object, V> dataCache;
+    private final Cache<Object, T> dataCache;
 
-    public ObjectCache(Storage<V> holder, long duration, TimeUnit unit) {
+    public ObjectCache(Storage<K, T> holder, long duration, TimeUnit unit) {
         this.holder = holder;
 
         dataCache = CacheBuilder.newBuilder()
@@ -31,7 +31,7 @@ public class ObjectCache<V extends DataObject> {
                 .build();
     }
 
-    public void put(V value) {
+    public void put(T value) {
         dataCache.put(value.getKey(), value);
     }
 
@@ -39,7 +39,7 @@ public class ObjectCache<V extends DataObject> {
         return (int) dataCache.size();
     }
 
-    private RemovalListener<Object, V> defaultRemovalListener() {
+    private RemovalListener<Object, T> defaultRemovalListener() {
         return notification -> {
             DataDebugLog.logDebug("Going to remove data from InputDataPool");
             if (notification.getCause() == RemovalCause.EXPIRED) {
@@ -51,7 +51,7 @@ public class ObjectCache<V extends DataObject> {
         };
     }
 
-    public Cache<Object, V> getDataCache() {
+    public Cache<Object, T> getDataCache() {
         return dataCache;
     }
 }
