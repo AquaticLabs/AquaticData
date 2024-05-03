@@ -4,9 +4,9 @@ import io.aquaticlabs.aquaticdata.AquaticDatabase;
 import io.aquaticlabs.aquaticdata.data.object.DataEntry;
 import io.aquaticlabs.aquaticdata.data.storage.ColumnType;
 import io.aquaticlabs.aquaticdata.data.storage.queue.ConnectionRequest;
-import io.aquaticlabs.aquaticdata.data.tasks.AquaticRunnable;
-import io.aquaticlabs.aquaticdata.data.tasks.RepeatingTask;
-import io.aquaticlabs.aquaticdata.data.tasks.TaskFactory;
+import io.aquaticlabs.aquaticdata.tasks.AquaticRunnable;
+import io.aquaticlabs.aquaticdata.tasks.RepeatingTask;
+import io.aquaticlabs.aquaticdata.tasks.TaskFactory;
 import io.aquaticlabs.aquaticdata.data.type.DataCredential;
 import io.aquaticlabs.aquaticdata.util.DataDebugLog;
 

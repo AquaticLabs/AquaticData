@@ -1,11 +1,7 @@
 package io.aquaticlabs.aquaticdata.util;
 
 import com.google.gson.internal.Primitives;
-import io.aquaticlabs.aquaticdata.data.object.SerializableObject;
-import io.aquaticlabs.aquaticdata.data.storage.SerializedData;
-import lombok.SneakyThrows;
 
-import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -31,6 +27,12 @@ public class StorageUtil {
     }
 
 
+    public static boolean isAtDefaultValue(Object object) {
+        if (object instanceof Number) {
+            return ((Number) object).intValue() == 0;
+        }
+        return object == null;
+    }
 
     public static void calculateMoves(Map<String, String> movesNeeded, List<String> order, List<String> desiredOrder) {
         List<String> fixing = new ArrayList<>(order);
@@ -75,8 +77,6 @@ public class StorageUtil {
 
                 fixing.remove(value);
                 fixing.add(invalidPos, value);
-
-
             }
             i++;
         }
@@ -97,16 +97,13 @@ public class StorageUtil {
             return objectString;
 
         } catch (Exception e) {
-            e.printStackTrace();
+            DataDebugLog.logError("Failed to create object from string: ", e);
         }
         return object.toString();
     }
 
     public static <T> T fromObject(Object object, Class<T> clazz) {
         clazz = Primitives.wrap(clazz);
-
-        if (SerializableObject.class.isAssignableFrom(clazz))
-            return fromSerializable(object, clazz);
 
         if (clazz.isEnum()) return (T) Enum.valueOf((Class<Enum>) clazz, object.toString());
 
@@ -156,21 +153,4 @@ public class StorageUtil {
                             + clazz.getSimpleName()
                             + " unknown conversion!");
     }
-
-
-    @SneakyThrows
-    public static <T> T fromSerializable(Object value, Class<T> clazz) {
-        T object = (T) getConstructor(clazz).newInstance();
-        ((SerializableObject) object).deserialize(new SerializedData());
-        return object;
-    }
-
-    @SneakyThrows
-    public static Constructor<?> getConstructor(Class<?> clazz) {
-        Constructor<?> constructor = clazz.getDeclaredConstructor();
-        constructor.setAccessible(true);
-        return constructor;
-    }
-
-
 }
