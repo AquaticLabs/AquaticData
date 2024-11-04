@@ -13,16 +13,21 @@ package io.aquaticlabs.aquaticdata.storage;
 
 import io.aquaticlabs.aquaticdata.Database;
 import io.aquaticlabs.aquaticdata.model.StorageModel;
+import io.aquaticlabs.aquaticdata.queue.ConnectionRequest;
 import io.aquaticlabs.aquaticdata.tasks.AquaticRunnable;
 import io.aquaticlabs.aquaticdata.tasks.TaskFactory;
 import io.aquaticlabs.aquaticdata.type.DataCredential;
+import io.aquaticlabs.aquaticdata.type.sql.SQLDatabase;
 import io.aquaticlabs.aquaticdata.util.DataDebugLog;
 import io.aquaticlabs.aquaticdata.util.DataEntry;
 import lombok.NonNull;
 
+import java.sql.ResultSet;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
+import java.util.jar.JarEntry;
 
 /**
  * @Author: extremesnow
@@ -33,7 +38,7 @@ public abstract class StorageHolder<K, T extends StorageModel> extends Storage<K
 
     private final Database<T> database;
 
-    protected StorageHolder(DataCredential dataCredential, Class<K> keyClazz, Class<T> clazz, @NonNull Executor asyncExecutor, @NonNull Executor syncExecutor) {
+    protected StorageHolder(DataCredential dataCredential, Class<K> keyClazz, Class<T> clazz, StorageMode storageMode, @NonNull Executor asyncExecutor, @NonNull Executor syncExecutor) {
         setKeyClass(keyClazz);
 
         String splitName = keyClazz.getName().split("\\.")[keyClazz.getName().split("\\.").length - 1];
@@ -43,9 +48,10 @@ public abstract class StorageHolder<K, T extends StorageModel> extends Storage<K
         database.addVariant(dataCredential.getTableName(), clazz);
     }
 
+
     protected void loadDatabase() {
-        database.start(this);
-        initCacheMode(getca);
+        initCacheMode(getCacheSaveMode(), getCacheTimeInSecondsToSave());
+        database.start(this, false);
     }
 
     public void shutdown() {
@@ -69,9 +75,9 @@ public abstract class StorageHolder<K, T extends StorageModel> extends Storage<K
         }
     }
 
-    private void initCacheMode(CacheMode cacheMode, long saveInterval) {
+    private void initCacheMode(CacheSaveMode cacheSaveMode, long saveInterval) {
         setCacheSaveTime(saveInterval);
-        if (cacheMode == CacheMode.TIME) {
+        if (cacheSaveMode == CacheSaveMode.TIME) {
             cacheSaveTask = getTaskFactory().createRepeatingTask(new AquaticRunnable() {
                 @Override
                 public void run() {
@@ -98,7 +104,15 @@ public abstract class StorageHolder<K, T extends StorageModel> extends Storage<K
         return database.load(this, key, async);
     }
 
+    protected CompletableFuture<List<T>> getKeyedList(String key, String keyValue, boolean async) {
+        return database.getKeyedList(key, keyValue, async);
+    }
+
     protected CompletableFuture<List<T>> loadAll(boolean async) {
         return database.loadAll(this, async);
+    }
+
+    protected void executeRequest(ConnectionRequest<?> connectionRequest) {
+        database.executeRequest(connectionRequest);
     }
 }

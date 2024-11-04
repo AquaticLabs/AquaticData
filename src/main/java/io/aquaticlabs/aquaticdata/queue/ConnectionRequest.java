@@ -1,6 +1,6 @@
 package io.aquaticlabs.aquaticdata.queue;
 
-import io.aquaticlabs.aquaticdata.data.HikariCPDatabase;
+import io.aquaticlabs.aquaticdata.type.sql.HikariCPDatabase;
 import lombok.Getter;
 
 import java.util.ArrayList;

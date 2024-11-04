@@ -78,6 +78,15 @@ public abstract class Database<T extends StorageModel> {
         }
     }
 
+    protected <K> T attemptFetch(Storage<K, T> holder, K key) {
+        T getValue = holder.get(key);
+        if (getValue == null) {
+            return construct(getVariant(getTableStructure().getTableName()));
+        }
+        return getValue;
+    }
+
+
     @SneakyThrows
     @SuppressWarnings("unchecked")
     public <B extends T> B construct(Class<B> clazz) {
@@ -101,14 +110,17 @@ public abstract class Database<T extends StorageModel> {
 
     public abstract <K> void start(Storage<K, T> holder);
 
-    public abstract void shutdown();
+    public abstract <K> void start(Storage<K, T> holder, boolean async);
 
+    public abstract void shutdown();
 
     public abstract CompletableFuture<Boolean> confirmTable(DatabaseStructure modifiedStructure);
 
     public abstract <S extends Iterable<T>> CompletableFuture<List<T>> saveLoaded(S data, boolean async);
 
     public abstract CompletableFuture<List<T>> saveList(List<T> list, boolean async);
+
+    public abstract CompletableFuture<List<T>> getKeyedList(String key, String keyValue, boolean async);
 
     public abstract CompletableFuture<T> save(T object, boolean async);
 

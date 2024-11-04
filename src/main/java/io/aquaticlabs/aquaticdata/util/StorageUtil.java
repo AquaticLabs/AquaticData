@@ -1,6 +1,6 @@
 package io.aquaticlabs.aquaticdata.util;
 
-import com.google.gson.internal.Primitives;
+import com.google.common.primitives.Primitives;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.UUID;
 
 public class StorageUtil {
+
 
     private static final List<Class> primitiveList =
             new ArrayList<Class>() {
@@ -54,6 +55,7 @@ public class StorageUtil {
         }
         return true;
     }
+
     public static void changeOrder(Map<String, String> movesNeeded, List<String> fixing, List<String> desiredOrder) {
         List<String> fixingClone = new ArrayList<>(fixing);
         int invalidPos = -1;
@@ -85,7 +87,7 @@ public class StorageUtil {
     public static String fromObject(Object object) {
         if (!(object instanceof String)) {
             if (object instanceof Boolean) {
-                object = (boolean)object ? 1 : 0;
+                object = (boolean) object ? 1 : 0;
             }
             return object.toString();
         }

@@ -1,21 +1,5 @@
 package testing;
 
-import io.aquaticlabs.aquaticdata.AquaticDatabase;
-import io.aquaticlabs.aquaticdata.data.object.DataEntry;
-import io.aquaticlabs.aquaticdata.data.storage.ColumnType;
-import io.aquaticlabs.aquaticdata.data.storage.queue.ConnectionRequest;
-import io.aquaticlabs.aquaticdata.tasks.AquaticRunnable;
-import io.aquaticlabs.aquaticdata.tasks.RepeatingTask;
-import io.aquaticlabs.aquaticdata.tasks.TaskFactory;
-import io.aquaticlabs.aquaticdata.data.type.DataCredential;
-import io.aquaticlabs.aquaticdata.util.DataDebugLog;
-
-import java.io.File;
-import java.util.List;
-import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.logging.Logger;
 
 /**
  * @Author: extremesnow
@@ -24,12 +8,8 @@ import java.util.logging.Logger;
  */
 public class TestMain {
 
-    public static TestHold testHold;
-
     public static void main(String[] args) {
-        System.out.println(new File("resources").toPath());
-
-        AquaticDatabase aquaticDatabase = new AquaticDatabase(CompletableFuture::runAsync, Runnable::run, true, Logger.getLogger("AqLabs"));
+   /*     System.out.println(new File("resources").toPath());
 
         DataCredential sqlite = new DataCredential().SQLiteCredential(new File("G:\\Projects\\DataStuff"), "testDataConfirmTables", "testDataConfirmTables");
         //DataCredential mariaDB = new DataCredential().MariaDBCredential("testtable", "localhost", 3306, "root", "password", "testingMariaDB");
@@ -42,10 +22,10 @@ public class TestMain {
         TestData testData = testHold.getOrInsert(new TestData(UUID.fromString("269d4132-8758-458f-9087-344325ee14cf"), "Rod", 42));
 
         //testHold.saveSingle(testData,true);
-/*        TestData testData2 = testHold.getOrInsert(new TestData(UUID.randomUUID(), "Shod", 11));
+*//*        TestData testData2 = testHold.getOrInsert(new TestData(UUID.randomUUID(), "Shod", 11));
         TestData testData3 = testHold.getOrInsert(new TestData(UUID.randomUUID(), "Brodd", 24));
         TestData testData4 = testHold.getOrInsert(new TestData(UUID.randomUUID(), "Nod", 5));
-        TestData testData5 = testHold.getOrInsert(new TestData(UUID.randomUUID(), "Lodd", 53));*/
+        TestData testData5 = testHold.getOrInsert(new TestData(UUID.randomUUID(), "Lodd", 53));*//*
 
 
         testHold.saveLoaded(false);
@@ -74,7 +54,7 @@ public class TestMain {
         }, 3);
 
 
-/*
+*//*
         factory.createDelayedTask(new AquaticRunnable() {
             @Override
             public void run() {
@@ -97,7 +77,7 @@ public class TestMain {
 
         }, 5);
 
-*/
+*//*
 
         System.out.println("cache time seconds to save: " + testHold.getCacheTimeInSecondsToSave());
 
@@ -139,6 +119,6 @@ public class TestMain {
 
         DataDebugLog.logDebug("MYSQL TABLE CREATION: " + queryBuilder);
 
-        return queryBuilder.toString();
+        return queryBuilder.toString();*/
     }
 }

@@ -26,7 +26,6 @@ import java.lang.reflect.Constructor;
 @Getter
 public abstract class Storage<K, T extends StorageModel> implements Iterable<T> {
 
-
     @Setter
     private Class<K> keyClass;
 
@@ -36,7 +35,7 @@ public abstract class Storage<K, T extends StorageModel> implements Iterable<T> 
     @Setter
     private StorageMode storageMode = StorageMode.LOAD_AND_STORE;
     @Setter
-    private CacheMode cacheMode = CacheMode.TIME;
+    private CacheSaveMode cacheSaveMode = CacheSaveMode.TIME;
 
     private ObjectCache<K, T> temporaryDataCache;
 
@@ -89,6 +88,10 @@ public abstract class Storage<K, T extends StorageModel> implements Iterable<T> 
 
     public abstract T get(K key);
 
+
+
+
+
     public abstract Serializer<T> createSerializer();
 
     protected Constructor<T> constructorOf(Class<T> type) throws ConstuctorFailThrowable {
@@ -102,7 +105,7 @@ public abstract class Storage<K, T extends StorageModel> implements Iterable<T> 
         return constructor;
     }
 
-    public enum CacheMode {
+    public enum CacheSaveMode {
 
         TIME,
         INSTANT,
