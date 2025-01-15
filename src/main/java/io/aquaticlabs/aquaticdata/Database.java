@@ -3,10 +3,12 @@ package io.aquaticlabs.aquaticdata;
 import io.aquaticlabs.aquaticdata.cache.ModelCachedData;
 import io.aquaticlabs.aquaticdata.model.SerializedData;
 import io.aquaticlabs.aquaticdata.model.Serializer;
+import io.aquaticlabs.aquaticdata.model.SimpleStorageModel;
 import io.aquaticlabs.aquaticdata.model.StorageModel;
 import io.aquaticlabs.aquaticdata.queue.ConnectionQueue;
 import io.aquaticlabs.aquaticdata.queue.ConnectionRequest;
 import io.aquaticlabs.aquaticdata.storage.Storage;
+import io.aquaticlabs.aquaticdata.type.sql.SQLDatabase;
 import io.aquaticlabs.aquaticdata.util.DataEntry;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -15,7 +17,6 @@ import lombok.Setter;
 import lombok.SneakyThrows;
 
 import java.lang.reflect.Constructor;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -33,11 +34,16 @@ public abstract class Database<T extends StorageModel> {
     private final DatabaseStructure tableStructure;
     private final ConnectionQueue connectionQueue;
     private final Serializer<T> serializer;
+
+    @NonNull
     @Setter
+    @Getter
     private Class<?> keyClass;
 
+    @NonNull
     @Getter
-    private final Map<String, Class<T>> variants = new HashMap<>();
+    @Setter
+    private Class<T> dataClass;
 
     @Getter(value = AccessLevel.PROTECTED)
     private final Map<String, ModelCachedData> dataCache = new ConcurrentHashMap<>();
@@ -60,14 +66,6 @@ public abstract class Database<T extends StorageModel> {
         return async ? asyncExecutor : syncExecutor;
     }
 
-    public void addVariant(String variant, Class<T> clazz) {
-        variants.put(variant, clazz);
-    }
-
-    public Class<T> getVariant(String variant) {
-        return variants.get(variant);
-    }
-
     protected void loadIntoCache(T object, SerializedData data) {
         ModelCachedData cache = getDataCache().computeIfAbsent(object.getKey().toString(), key -> new ModelCachedData());
 
@@ -77,15 +75,6 @@ public abstract class Database<T extends StorageModel> {
             cache.add(column, value);
         }
     }
-
-    protected <K> T attemptFetch(Storage<K, T> holder, K key) {
-        T getValue = holder.get(key);
-        if (getValue == null) {
-            return construct(getVariant(getTableStructure().getTableName()));
-        }
-        return getValue;
-    }
-
 
     @SneakyThrows
     @SuppressWarnings("unchecked")
@@ -118,13 +107,19 @@ public abstract class Database<T extends StorageModel> {
 
     public abstract <S extends Iterable<T>> CompletableFuture<List<T>> saveLoaded(S data, boolean async);
 
+    public abstract <S extends Iterable<T>> CompletableFuture<List<T>> saveLoaded(S data, boolean async, boolean useRunner);
+
     public abstract CompletableFuture<List<T>> saveList(List<T> list, boolean async);
 
     public abstract CompletableFuture<List<T>> getKeyedList(String key, String keyValue, boolean async);
 
+    public abstract CompletableFuture<List<SimpleStorageModel>> getSortedListByColumn(DatabaseStructure databaseStructure, String sortByColumnName, SQLDatabase.SortOrder sortOrder, int limit, int offset, boolean async);
+
     public abstract CompletableFuture<T> save(T object, boolean async);
 
     public abstract <K> CompletableFuture<T> load(Storage<K, T> holder, DataEntry<String, K> key, boolean async);
+
+    public abstract <K> CompletableFuture<T> load(Storage<K, T> holder, DataEntry<String, K> key, boolean async, boolean persist);
 
     public abstract <K> CompletableFuture<List<T>> loadAll(Storage<K, T> holder, boolean async);
 

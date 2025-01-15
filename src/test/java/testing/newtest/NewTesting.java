@@ -14,7 +14,9 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -27,7 +29,7 @@ import java.util.concurrent.TimeoutException;
  * On: 11/3/2024
  * At: 17:40
  */
-public class NewTesting {
+class NewTesting {
 
     LogDataHolder holder;
 
@@ -86,6 +88,46 @@ public class NewTesting {
 
     }
 
+    private final Set<String> userNames = new HashSet<>();
+
+    @Test
+    void testLoadNames() {
+        System.out.println("LoadDates");
+
+        holder.callSQLRequest(new ConnectionRequest<>((connection) -> {
+            try (PreparedStatement statement = connection.prepareStatement("SELECT name FROM minealerts_log_data")) {
+                ResultSet rs = statement.executeQuery();
+                while (rs.next()) {
+                    userNames.add(rs.getString(1));
+                }
+                System.out.println(userNames.size() + " usernames");
+
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+            return null;
+        }, Runnable::run));
+
+    }
+
+
+    @Test
+    void testCheckData() throws ExecutionException, InterruptedException, TimeoutException {
+
+        CompletableFuture<List<LogData>> dataFuture = holder.loadUUIDData(UUID.fromString("a749ef94-6d09-43b4-9abe-48cf93bfa961"));
+
+        List<LogData> data = dataFuture.get(1, TimeUnit.MINUTES);
+
+        LogData logData = data.get(0);
+        CheckData checkData = logData.getCheckData();
+/*        for (LogData data1 : data) {
+            System.out.println(data1.getCheckData().toString());
+        }*/
+        System.out.println(checkData.toString());
+
+        Assertions.assertFalse(data.get(0).getCheckData().isSurfaceOre());
+
+    }
 
 
 

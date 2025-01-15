@@ -8,6 +8,7 @@ import io.aquaticlabs.aquaticdata.model.StorageModel;
 import io.aquaticlabs.aquaticdata.storage.Storage;
 import io.aquaticlabs.aquaticdata.util.DataDebugLog;
 
+import java.time.Instant;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -19,7 +20,7 @@ public class ObjectCache<K, T extends StorageModel> {
 
     private final Storage<K, T> holder;
 
-    private final Cache<Object, T> dataCache;
+    private Cache<Object, T> dataCache;
 
     public ObjectCache(Storage<K, T> holder, long duration, TimeUnit unit) {
         this.holder = holder;
@@ -27,6 +28,15 @@ public class ObjectCache<K, T extends StorageModel> {
         dataCache = CacheBuilder.newBuilder()
                 .maximumSize(800)
                 .expireAfterWrite(duration, unit)
+                .removalListener(defaultRemovalListener())
+                .build();
+    }
+
+    public void setOrResetInterval(int interval) {
+        dataCache = null;
+        dataCache = CacheBuilder.newBuilder()
+                .maximumSize(800)
+                .expireAfterWrite(interval, TimeUnit.SECONDS)
                 .removalListener(defaultRemovalListener())
                 .build();
     }
@@ -41,12 +51,13 @@ public class ObjectCache<K, T extends StorageModel> {
 
     private RemovalListener<Object, T> defaultRemovalListener() {
         return notification -> {
-            DataDebugLog.logDebug("Going to remove data from InputDataPool");
+            String cause = notification.getCause().name();
+           // DataDebugLog.logDebug(timestamp + " Going to remove data from InputDataPool reason: " + cause);
             if (notification.getCause() == RemovalCause.EXPIRED) {
                 DataDebugLog.logDebug("This data expired: " + notification.getKey());
                 holder.remove(notification.getValue());
             } else {
-                DataDebugLog.logDebug("This data was manually removed: " + notification.getKey());
+                //DataDebugLog.logDebug(timestamp + " This data was manually removed: " + notification.getKey());
             }
         };
     }

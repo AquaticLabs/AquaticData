@@ -4,24 +4,26 @@ import lombok.Getter;
 
 @Getter
 public enum SQLColumnType {
-    INT("INT"),
-    INTEGER("INTEGER"),
-    FLOAT("FLOAT"),
-    LONG("BIGINT"),
-    TEXT("TEXT"),
-    VARCHAR("VARCHAR(255)"),
-    VARCHAR_UUID("VARCHAR(36)"),
-    VARCHAR_UUID2("VARCHAR(37)"),
-    VARCHAR_64("VARCHAR(64)"),
-    DOUBLE("DOUBLE"),
-    BOOLEAN("BOOLEAN"),
-    TINY_INT("TINYINT"),
-    BIT("BIT");
+    INT("INT", int.class),
+    INTEGER("INTEGER", int.class),
+    FLOAT("FLOAT", float.class),
+    LONG("BIGINT", long.class),
+    TEXT("TEXT", String.class),
+    VARCHAR("VARCHAR(255)", String.class),
+    VARCHAR_UUID("VARCHAR(36)", String.class),
+    VARCHAR_UUID2("VARCHAR(37)", String.class),
+    VARCHAR_64("VARCHAR(64)", String.class),
+    DOUBLE("DOUBLE", double.class),
+    BOOLEAN("BOOLEAN", boolean.class),
+    TINY_INT("TINYINT", int.class),
+    BIT("BIT", int.class);
 
     private final String sql;
+    private final Class<?> associatedClass;
 
-    SQLColumnType(String sql) {
+    SQLColumnType(String sql, Class<?> associatedClass) {
         this.sql = sql;
+        this.associatedClass = associatedClass;
     }
 
     public static SQLColumnType matchType(String s) {
@@ -50,6 +52,15 @@ public enum SQLColumnType {
 
     public boolean isInt() {
         return this.equals(INT) || this.equals(INTEGER);
+    }
+
+    public static SQLColumnType matchColumnClassType(Class<?> clazz) {
+        for (SQLColumnType type : values()) {
+            if (type.getAssociatedClass().equals(clazz)) {
+                return type;
+            }
+        }
+        throw new IllegalArgumentException("Unsupported class type: " + clazz.getName());
     }
 
     public static boolean isSimilarMatching(SQLColumnType type1, SQLColumnType type2) {

@@ -4,6 +4,7 @@ import io.aquaticlabs.aquaticdata.model.SerializedData;
 import io.aquaticlabs.aquaticdata.model.StorageModel;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.ToString;
 
 import java.util.UUID;
 
@@ -78,5 +79,7 @@ public class LogData implements StorageModel, Comparable<LogData> {
     public int compareTo(LogData otherData) {
         return Long.compare(this.timestamp, otherData.timestamp);
     }
+
+
 
 }

@@ -12,6 +12,7 @@ import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * @Author: extremesnow
@@ -21,6 +22,8 @@ import java.util.concurrent.TimeUnit;
 public class TaskFactory {
 
     private static final Set<TaskFactory> factories = new HashSet<>();
+    @Getter
+    private final AtomicBoolean isShuttingDown = new AtomicBoolean(false);
 
     public static TaskFactory getFactory(String ownerID) {
         TaskFactory factory = null;
@@ -66,7 +69,12 @@ public class TaskFactory {
     }
 
 
+
     public SimpleTask runTask(AquaticRunnable runnable) {
+        if (isShuttingDown.get()) {
+            DataDebugLog.logDebug("Task creation ignored as Task Factory is shutting down: " + ownerID);
+            return null; // or an appropriate no-op task if needed
+        }
         SimpleTask task = new SimpleTask(this, scheduledExecutorService, runnable);
         activeTasks.put(task.getId(), task);
         return task;
@@ -105,6 +113,10 @@ public class TaskFactory {
      * @return a new instance of {@link RepeatingTask}
      */
     public RepeatingTask createRepeatingTask(AquaticRunnable runnable, long interval, long delay, TimeUnit timeUnit) {
+        if (isShuttingDown.get()) {
+            DataDebugLog.logDebug("Task creation ignored as Task Factory is shutting down: " + ownerID);
+            return null; // or an appropriate no-op task if needed
+        }
         RepeatingTask task = new RepeatingTask(this, scheduledExecutorService, runnable, interval, delay, timeUnit);
         activeTasks.put(task.getId(), task);
         return task;
@@ -118,6 +130,10 @@ public class TaskFactory {
      * @return a new instance of {@link DelayedTask}
      */
     public DelayedTask createDelayedTask(AquaticRunnable runnable, long delay) {
+        if (isShuttingDown.get()) {
+            DataDebugLog.logDebug("Task creation ignored as Task Factory is shutting down: " + ownerID);
+            return null; // or an appropriate no-op task if needed
+        }
         DelayedTask task = new DelayedTask(this, scheduledExecutorService, runnable, delay);
         activeTasks.put(task.getId(), task);
         return task;
@@ -128,10 +144,28 @@ public class TaskFactory {
      * Any scheduled tasks will be cancelled and any active tasks will be allowed to complete.
      */
     public void shutdown() {
+        DataDebugLog.logDebug("Shutting down Task Factory " + ownerID);
 
-        List<Runnable> canceledTasks = scheduledExecutorService.shutdownNow();
-        DataDebugLog.logDebug("Task Factory " + ownerID + " has shut down, " + canceledTasks.size() + " tasks were forcefully stopped and not completed.");
+        // Initiate shutdown
+        isShuttingDown.set(true);
+        scheduledExecutorService.shutdown();
+        DataDebugLog.logConsole("Database may take up to 60 seconds to shutdown.");
 
+        try {
+            // Wait for existing tasks to complete
+            if (!scheduledExecutorService.awaitTermination(60, TimeUnit.SECONDS)) {
+                DataDebugLog.logDebug("Tasks did not terminate in the specified timeout. Forcing shutdown...");
+                List<Runnable> canceledTasks = scheduledExecutorService.shutdownNow();
+                DataDebugLog.logDebug(canceledTasks.size() + " tasks were forcefully stopped.");
+            } else {
+                DataDebugLog.logDebug("Task Factory " + ownerID + " shut down gracefully.");
+            }
+        } catch (InterruptedException e) {
+            DataDebugLog.logDebug("Shutdown interrupted. Forcing shutdown...");
+            List<Runnable> canceledTasks = scheduledExecutorService.shutdownNow();
+            DataDebugLog.logDebug(canceledTasks.size() + " tasks were forcefully stopped.");
+            Thread.currentThread().interrupt();
+        }
     }
 
 
@@ -139,12 +173,12 @@ public class TaskFactory {
         return currentID++;
     }
 
-    public void cancelTask(int taskId) {
-        if (!activeTasks.containsKey(taskId)) {
+    public synchronized void cancelTask(int taskId) {
+        AquaticTask task = activeTasks.remove(taskId);
+        if (task == null) {
             DataDebugLog.logError("Tried to cancel a task that wasn't scheduled.");
             return;
         }
-        activeTasks.get(taskId).cancel();
+        task.cancel();
     }
-
 }

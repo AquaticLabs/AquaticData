@@ -1,124 +1,174 @@
 package testing;
 
 
+import io.aquaticlabs.aquaticdata.model.SimpleStorageModel;
+import io.aquaticlabs.aquaticdata.tasks.TaskFactory;
+import io.aquaticlabs.aquaticdata.type.sql.sqlite.SQLiteCredential;
+import io.aquaticlabs.aquaticdata.util.DataDebugLog;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.List;
+import java.util.Random;
+import java.util.UUID;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
+
 /**
  * @Author: extremesnow
  * On: 8/24/2022
  * At: 21:16
  */
-public class TestMain {
+class TestMain {
 
-    public static void main(String[] args) {
-   /*     System.out.println(new File("resources").toPath());
+    TestHolder holder;
 
-        DataCredential sqlite = new DataCredential().SQLiteCredential(new File("G:\\Projects\\DataStuff"), "testDataConfirmTables", "testDataConfirmTables");
-        //DataCredential mariaDB = new DataCredential().MariaDBCredential("testtable", "localhost", 3306, "root", "password", "testingMariaDB");
+    @BeforeEach
+    void setup() {
+        DataDebugLog.setDebug(true);
 
-        testHold = new TestHold(sqlite);
+        holder = new TestHolder(new SQLiteCredential("TestingSB", "TestingTable", new File("")));
+    }
+
+    @AfterEach
+    void tearDown() throws IOException {
+        holder.close();
+        //Files.deleteIfExists(Paths.get("TestingSB.db"));
+    }
+
+    @Test
+    void testGetNull() {
+        Assertions.assertNull(holder.getOrNull(UUID.randomUUID()));
+    }
+
+    void testGetUUID() {
+        Assertions.assertNotNull(holder.loadIntoCache(UUID.fromString("f911d440-583e-4131-91ad-3e8b62dda1a1")));
+    }
 
 
-        System.out.println(buildCreateTableSQL(testHold.getStructure(),false));
+    void addEntry() {
+        TestData data = new TestData(UUID.randomUUID());
+        data.setName("Jeff");
+        data.setValue(10);
 
-        TestData testData = testHold.getOrInsert(new TestData(UUID.fromString("269d4132-8758-458f-9087-344325ee14cf"), "Rod", 42));
+        holder.create(data);
 
-        //testHold.saveSingle(testData,true);
-*//*        TestData testData2 = testHold.getOrInsert(new TestData(UUID.randomUUID(), "Shod", 11));
-        TestData testData3 = testHold.getOrInsert(new TestData(UUID.randomUUID(), "Brodd", 24));
-        TestData testData4 = testHold.getOrInsert(new TestData(UUID.randomUUID(), "Nod", 5));
-        TestData testData5 = testHold.getOrInsert(new TestData(UUID.randomUUID(), "Lodd", 53));*//*
+        TestData loadedData = holder.getOrCreate(data.getKey());
+
+        Assertions.assertEquals(data.getKey(), loadedData.getKey());
+        Assertions.assertEquals(data.getName(), loadedData.getName());
+        Assertions.assertEquals(data.getValue(), loadedData.getValue());
+    }
+
+    void addBulk() throws ExecutionException, InterruptedException, TimeoutException {
+        for (int i = 0; i < 100000; i++) {
+            TestData data = new TestData(UUID.randomUUID());
+            data.setName("Tony: " + i);
+            data.setValue(randomNumber(1, 100000));
+            holder.add(data);
+        }
+        holder.saveAll(false);
+
+    }
+
+    @Test
+    void testRank() throws ExecutionException, InterruptedException, TimeoutException {
+        System.out.println("1");
+
+        holder.loadRanks("value");
+        System.out.println("ranks");
+    }
 
 
-        testHold.saveLoaded(false);
+    void testGetSortedList() throws ExecutionException, InterruptedException, TimeoutException {
 
+/*
+        for (int i = 0; i < 100000; i++) {
+            TestData data = new TestData(UUID.randomUUID());
+            data.setName("Tony: " + i);
+            data.setValue(randomNumber(1, 1341231));
+            holder.add(data);
+        }
+        holder.saveAll(false);
+
+*/
+
+        try {
+            List<SimpleStorageModel> sortedList = holder.getSortedDataList("value").get(1, TimeUnit.MINUTES);
+            Assertions.assertFalse(sortedList.isEmpty());
+            int firstVal = -1;
+            for (SimpleStorageModel model : sortedList) {
+                if (firstVal == -1) {
+                    firstVal = (int) model.getValue("value");
+                }
+                System.out.println("Key: " + model.getKey() + " Name: " + model.getValue("name") + " Value: " + model.getValue("value"));
+            }
+            int lastVal = (int) sortedList.get(sortedList.size() - 1).getValue("value");
+
+            Assertions.assertTrue(firstVal > lastVal);
+
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+
+    public static Integer randomNumber(int min, int max) {
+        Random i = new Random();
+        if (max == min) {
+            return max;
+        } else {
+            return min + i.nextInt(max - min);
+        }
+    }
+
+    void loadValueAndTimeOut() {
+
+        TestData data = holder.loadIntoCache(UUID.fromString("c18762e4-a8f6-4e6a-8ed4-ea5e9e4f74ef"));
+
+        Assertions.assertEquals("Jeff", data.getName());
+
+        holder.closeOut(data.getKey());
+
+        Assertions.assertNull(holder.getOrNull(data.getKey()));
+
+    }
+
+    void loadValueAndTimeOut2() throws InterruptedException {
+
+        TestData data = holder.loadIntoCache(UUID.fromString("c18762e4-a8f6-4e6a-8ed4-ea5e9e4f74ef"));
+
+        Assertions.assertEquals("Jeff", data.getName());
 
         AtomicInteger secs = new AtomicInteger();
 
         TaskFactory factory = TaskFactory.getOrNew("Testing Factory");
-        RepeatingTask heart = factory.createRepeatingTask(new AquaticRunnable() {
+/*
+
+        factory.createRepeatingTask(new AquaticRunnable() {
             @Override
             public void run() {
                 System.out.println("Heart Beat: " + secs.getAndIncrement());
-
             }
         }, 1);
 
-
-        factory.createDelayedTask(new AquaticRunnable() {
-            @Override
-            public void run() {
-                DataDebugLog.logDebug("DELAYED TASK RAN");
-                TestData data = testHold.getOrNull(UUID.fromString("269d4132-8758-458f-9087-344325ee14cf"));
-                DataDebugLog.logDebug("UUID: " + data.uuid + " Name: " + data.name + " val: " + data.getLevel());
-
-            }
-        }, 3);
-
-
-*//*
-        factory.createDelayedTask(new AquaticRunnable() {
-            @Override
-            public void run() {
-                int i = 0;
-                for (TestData data : testHold.getData().values()) {
-                    System.out.println(data.toString());
-                    i++;
-                    if (i > 3) {
-                        break;
-                    }
-                }
-                System.out.println("Current Task ID: " + getTaskId());
-                System.out.println("Current TaskFactory Owner: " + getOwnerID());
-
-
-                TestData data = testHold.getOrNull(UUID.fromString("90b0aac2-2e16-48ea-a711-2066593386ba"));
-                System.out.println("Data OBJ2: ");
-                System.out.println(data.toString());
-            }
-
-        }, 5);
-
-*//*
-
-        System.out.println("cache time seconds to save: " + testHold.getCacheTimeInSecondsToSave());
-
-        testHold.getDatabase().getConnectionQueue().addConnectionRequest(new ConnectionRequest<>(conn -> {
-            System.out.println("DataSize: " + testHold.getDataSize(conn));
-            return null;
-        }, aquaticDatabase.getRunner(true)));
-
-
-        boolean quit = false;
-        while (secs.get() < 15) {
+        while (secs.get() < 6) {
         }
-        factory.shutdown();
-        //AquaticDatabase.getInstance().shutdown();
-        testHold.shutdown();
+*/
+
+        System.out.println("timoutTime: " + holder.getTimeOutTime());
+
+        holder.cleanUp();
+        Assertions.assertNull(holder.getOrNull(data.getKey()));
 
     }
-    private static String buildCreateTableSQL(List<DataEntry<String, ColumnType>> columns, boolean force) {
-        StringBuilder queryBuilder = new StringBuilder();
-        queryBuilder.append("CREATE TABLE ");
-        if (!force) {
-            queryBuilder.append("IF NOT EXISTS ");
-        }
-        queryBuilder
-                .append("testtable")
-                .append(" (");
 
-        for (int i = 0; i < columns.size(); i++) {
-            DataEntry<String, ColumnType> column = columns.get(i);
-            queryBuilder.append(column.getKey()).append(" ").append(column.getValue().getSql()); // maybe add not null?
-            if (i != columns.size() - 1) {
-                queryBuilder.append(", ");
-            }
-        }
-        queryBuilder
-                .append(", PRIMARY KEY ( ")
-                .append(columns.get(0).getKey())
-                .append(" ));");
 
-        DataDebugLog.logDebug("MYSQL TABLE CREATION: " + queryBuilder);
-
-        return queryBuilder.toString();*/
-    }
 }

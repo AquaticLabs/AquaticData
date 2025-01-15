@@ -15,24 +15,28 @@ import java.util.Map;
 @Getter
 public class DatabaseStructure {
 
+    private String keyName;
     private final Map<String, SQLColumnType> columnStructure = new LinkedHashMap<>();
     private final Map<String, Object> columnValues = new LinkedHashMap<>();
     private final Map<String, Object> columnDefaults = new LinkedHashMap<>();
 
     private String tableName;
 
-    public DatabaseStructure() {}
+    public DatabaseStructure() {
+    }
 
     public DatabaseStructure(String tableName) {
         this.tableName = tableName;
     }
-
 
     public DatabaseStructure addColumn(String columnName, SQLColumnType sqlColumnType) {
         return addColumn(columnName, sqlColumnType, "");
     }
 
     public DatabaseStructure addColumn(String columnName, SQLColumnType sqlColumnType, Object defaultValue) {
+        if (keyName == null) {
+            keyName = columnName;
+        }
         columnStructure.put(columnName, sqlColumnType);
         columnDefaults.put(columnName, defaultValue);
         return this;

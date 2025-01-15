@@ -54,6 +54,7 @@ public class RepeatingTask implements AquaticTask {
         return ownerId;
     }
 
+    @Override
     public void cancel() {
         futureTask.cancel(true);
     }

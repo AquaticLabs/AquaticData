@@ -32,7 +32,7 @@ public class MySQLDatabase<T extends StorageModel> extends SQLDatabase<T> {
         super(credential, tableStructure, serializer, asyncExecutor, syncExecutor);
 
         HikariConfig config = new HikariConfig();
-        config.setPoolName("Frosty Core MySQL Pool");
+        config.setPoolName("Aquatic Labs MySQL Pool");
         config.setDriverClassName("com.mysql.jdbc.Driver");
 
         String url = "jdbc:mysql://" + credential.getHostname() + ":" + credential.getPort() + "/" + credential.getDatabaseName();
@@ -205,15 +205,7 @@ public class MySQLDatabase<T extends StorageModel> extends SQLDatabase<T> {
 
         return builder.toString();
     }
-    @Override
-    public String insertPreparedStatement(DatabaseStructure modifiedStructure) {
-        return null;
-    }
 
-    @Override
-    public String updatePreparedStatement(DatabaseStructure modifiedStructure) {
-        return null;
-    }
     @Override
     public void dropTable() {
         executeRequest(new ConnectionRequest<>(connection -> {

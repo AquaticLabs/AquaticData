@@ -7,6 +7,7 @@ package io.aquaticlabs.aquaticdata.storage;
  */
 public enum StorageMode {
 
+    CACHE,
     LOAD_AND_STORE,
     LOAD_AND_REMOVE,
     LOAD_AND_TIMEOUT,

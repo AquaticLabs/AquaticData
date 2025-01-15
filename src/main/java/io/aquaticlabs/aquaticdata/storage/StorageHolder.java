@@ -12,6 +12,8 @@
 package io.aquaticlabs.aquaticdata.storage;
 
 import io.aquaticlabs.aquaticdata.Database;
+import io.aquaticlabs.aquaticdata.DatabaseStructure;
+import io.aquaticlabs.aquaticdata.model.SimpleStorageModel;
 import io.aquaticlabs.aquaticdata.model.StorageModel;
 import io.aquaticlabs.aquaticdata.queue.ConnectionRequest;
 import io.aquaticlabs.aquaticdata.tasks.AquaticRunnable;
@@ -22,12 +24,9 @@ import io.aquaticlabs.aquaticdata.util.DataDebugLog;
 import io.aquaticlabs.aquaticdata.util.DataEntry;
 import lombok.NonNull;
 
-import java.sql.ResultSet;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
-import java.util.jar.JarEntry;
 
 /**
  * @Author: extremesnow
@@ -43,9 +42,11 @@ public abstract class StorageHolder<K, T extends StorageModel> extends Storage<K
 
         String splitName = keyClazz.getName().split("\\.")[keyClazz.getName().split("\\.").length - 1];
         setTaskFactory(TaskFactory.getOrNew("StorageHolder<T>(" + splitName + ") Factory"));
+        initStorageMode(storageMode);
 
         this.database = dataCredential.build(getStructure(), createSerializer(), asyncExecutor, syncExecutor);
-        database.addVariant(dataCredential.getTableName(), clazz);
+        this.database.setKeyClass(keyClazz);
+        this.database.setDataClass(clazz);
     }
 
 
@@ -55,22 +56,45 @@ public abstract class StorageHolder<K, T extends StorageModel> extends Storage<K
     }
 
     public void shutdown() {
-        database.shutdown();
+        if (cacheSaveTask != null) {
+            cacheSaveTask.cancel();
+        }
+        try {
+            database.saveLoaded(this, false, false).whenComplete((v, t) -> {
+                DataDebugLog.logDebug("SaveLoaded on Shutdown.");
+                database.shutdown();
+                getTaskFactory().shutdown();
+            });
+        } catch (Exception e) {
+            DataDebugLog.logError("Failed To Save Loaded on shutdown");
+        }
     }
+
 
     @Override
     protected void cleanCache() {
-        // not implemented
+        if (storageMode == StorageMode.LOAD_AND_TIMEOUT || storageMode == StorageMode.CACHE) {
+            temporaryDataCache.getDataCache().cleanUp();
+        }
     }
 
     @Override
     protected void addToCache(T object) {
-        // not implemented
+        switch (storageMode) {
+            case CACHE:
+            case LOAD_AND_TIMEOUT:
+                temporaryDataCache.put(object);
+                break;
+            case LOAD_AND_STORE:
+                break;
+            case LOAD_AND_REMOVE:
+                onRemove(object);
+        }
     }
 
     @Override
     public void invalidateCacheEntryIfMode(T object) {
-        if (getStorageMode() == StorageMode.LOAD_AND_TIMEOUT) {
+        if (getStorageMode() == StorageMode.LOAD_AND_TIMEOUT || getStorageMode() == StorageMode.CACHE) {
             getTemporaryDataCache().getDataCache().invalidate(object);
         }
     }
@@ -104,6 +128,10 @@ public abstract class StorageHolder<K, T extends StorageModel> extends Storage<K
         return database.load(this, key, async);
     }
 
+    protected CompletableFuture<T> load(DataEntry<String, K> key, boolean async, boolean persist) {
+        return database.load(this, key, async, persist);
+    }
+
     protected CompletableFuture<List<T>> getKeyedList(String key, String keyValue, boolean async) {
         return database.getKeyedList(key, keyValue, async);
     }
@@ -112,7 +140,18 @@ public abstract class StorageHolder<K, T extends StorageModel> extends Storage<K
         return database.loadAll(this, async);
     }
 
+    protected CompletableFuture<List<SimpleStorageModel>> getSortedListByColumn(DatabaseStructure databaseStructure, String sortByColumnName, SQLDatabase.SortOrder sortOrder, int limit, int offset, boolean async) {
+        return database.getSortedListByColumn(databaseStructure, sortByColumnName, sortOrder, limit, offset, async);
+    }
+
     protected void executeRequest(ConnectionRequest<?> connectionRequest) {
         database.executeRequest(connectionRequest);
+    }
+
+    protected void dropTable() {
+        if (database instanceof SQLDatabase) {
+            SQLDatabase<?> db = (SQLDatabase<?>) database;
+            db.dropTable();
+        }
     }
 }

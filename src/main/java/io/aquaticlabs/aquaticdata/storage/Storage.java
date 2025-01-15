@@ -22,6 +22,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.lang.reflect.Constructor;
+import java.util.concurrent.TimeUnit;
 
 @Getter
 public abstract class Storage<K, T extends StorageModel> implements Iterable<T> {
@@ -33,23 +34,40 @@ public abstract class Storage<K, T extends StorageModel> implements Iterable<T> 
     private TaskFactory taskFactory;
 
     @Setter
-    private StorageMode storageMode = StorageMode.LOAD_AND_STORE;
-    @Setter
-    private CacheSaveMode cacheSaveMode = CacheSaveMode.TIME;
-
-    private ObjectCache<K, T> temporaryDataCache;
-
-    @Setter
     private long cacheTimeInSecondsToSave = (60L * 5);
     /**
      * The Time in Minutes data should timeout (only active when LOAD_AND_TIMEOUT storage mode is active)
      */
-    @Setter
-    private int timeOutTime = 1;
+    private int timeOutTime = 60;
 
     protected RepeatingTask cacheSaveTask;
 
+    @Setter
+    protected StorageMode storageMode = StorageMode.LOAD_AND_STORE;
+    @Setter
+    private Storage.CacheSaveMode cacheSaveMode = Storage.CacheSaveMode.TIME;
+
+    protected ObjectCache<K, T> temporaryDataCache;
+
     public abstract DatabaseStructure getStructure();
+
+    protected void initStorageMode(StorageMode storageMode) {
+        this.storageMode = storageMode;
+        if (storageMode == StorageMode.LOAD_AND_TIMEOUT || storageMode == StorageMode.CACHE) {
+            temporaryDataCache = new ObjectCache<>(this, timeOutTime, TimeUnit.SECONDS);
+        }
+        if (storageMode == StorageMode.LOAD_AND_STORE) {
+
+        }
+    }
+
+    protected void setCacheTimeOutTime(int timeOutTime) {
+        this.timeOutTime = timeOutTime;
+        if (temporaryDataCache != null) {
+            temporaryDataCache.setOrResetInterval(timeOutTime);
+        }
+    }
+
 
     protected abstract void onAdd(T object);
 
@@ -85,25 +103,9 @@ public abstract class Storage<K, T extends StorageModel> implements Iterable<T> 
             cacheSaveTask.setOrResetInterval(cacheTimeInSecondsToSave);
     }
 
-
     public abstract T get(K key);
 
-
-
-
-
     public abstract Serializer<T> createSerializer();
-
-    protected Constructor<T> constructorOf(Class<T> type) throws ConstuctorFailThrowable {
-        Constructor<T> constructor;
-        try {
-            constructor = type.getDeclaredConstructor();
-            constructor.setAccessible(true);
-        } catch (NoSuchMethodException e) {
-            throw new ConstuctorFailThrowable("Please ensure that the type '" + type.getSimpleName() + "' has a single-arg constructor.");
-        }
-        return constructor;
-    }
 
     public enum CacheSaveMode {
 

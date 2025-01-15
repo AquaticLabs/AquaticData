@@ -1,9 +1,11 @@
 package io.aquaticlabs.aquaticdata.type.sql;
 
+import com.google.common.annotations.VisibleForTesting;
 import io.aquaticlabs.aquaticdata.DatabaseStructure;
 import io.aquaticlabs.aquaticdata.cache.ModelCachedData;
 import io.aquaticlabs.aquaticdata.model.SerializedData;
 import io.aquaticlabs.aquaticdata.model.Serializer;
+import io.aquaticlabs.aquaticdata.model.SimpleStorageModel;
 import io.aquaticlabs.aquaticdata.model.StorageModel;
 import io.aquaticlabs.aquaticdata.model.StorageValue;
 import io.aquaticlabs.aquaticdata.queue.ConnectionRequest;
@@ -35,7 +37,7 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
 
     private final SQLCredential credential;
     @Setter
-    private int batchSize = 250; // Adjust the batch size as needed
+    private int batchSize = 500; // Adjust the batch size as needed
 
     protected SQLDatabase(SQLCredential credential, DatabaseStructure tableStructure, Serializer<T> serializer, @NonNull Executor asyncExecutor, @NonNull Executor syncExecutor) {
         super(tableStructure, serializer, asyncExecutor, syncExecutor);
@@ -48,7 +50,7 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
     }
 
     public <K> void start(Storage<K, T> holder, boolean async) {
-        confirmTable(getTableStructure()).whenComplete((b, t) -> loadAll(holder, async));
+        confirmTable(getTableStructure());
         // load a cache ?
     }
 
@@ -95,9 +97,13 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
         return future;
     }
 
-/*
     @Override
     public <S extends Iterable<T>> CompletableFuture<List<T>> saveLoaded(S loaded, boolean async) {
+        return saveLoaded(loaded, async, true);
+    }
+
+    @Override
+    public <S extends Iterable<T>> CompletableFuture<List<T>> saveLoaded(S loaded, boolean async, boolean useRunner) {
         Executor executor = getExecutor(async);
         CompletableFuture<List<T>> future = new CompletableFuture<>();
 
@@ -106,10 +112,13 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
             List<T> saved = new ArrayList<>();
             try (Statement statement = connection.createStatement()) {
                 connection.setAutoCommit(false);
+
+                Map<Object, Boolean> existingEntries = cacheExistingEntries(connection);
+
                 try {
                     for (T object : loaded) {
 
-                        DataDebugLog.logDebug("Saving Loaded:" + object.getKey());
+                        DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Saving Loaded:" + object.getKey());
 
                         SerializedData data = new SerializedData();
                         getSerializer().serialize(object, data);
@@ -119,47 +128,50 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
 
                         // If the size is 1, it should only contain the key.
                         if (needsUpdate.getColumnValues().size() == 1) {
-                            DataDebugLog.logDebug("Needs update contains no data values. no need for updating");
+                            DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Needs update contains no data values. no need for updating");
                             continue;
                         }
 
-                        modified++;
-                        DatabaseStructure modifiedStructure = data.toDatabaseStructure(getTableStructure());
-                        if (doesEntryExist(connection, modifiedStructure.getFirstValuePair())) {
 
+                        DatabaseStructure modifiedStructure = data.toDatabaseStructure(getTableStructure());
+                        boolean exists = existingEntries.containsKey(object.getKey());
+
+                        DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: exists: " + exists);
+
+                        if (exists) {
                             try {
-                                DataDebugLog.logDebug("Adding Update Batch Statement");
+                                DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Adding Update Batch Statement");
                                 statement.addBatch(updateStatement(needsUpdate));
                                 saved.add(object);
                             } catch (SQLException e) {
-                                DataDebugLog.logDebug("Failed adding batch Data: " + e.getMessage());
+                                DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Failed adding batch Data: " + e.getMessage());
+                                continue;
                             }
                         } else {
                             try {
-                                DataDebugLog.logDebug("Adding Insert Batch Statement");
+                                DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Adding Insert Batch Statement");
                                 statement.addBatch(insertStatement(modifiedStructure));
                                 saved.add(object);
                             } catch (SQLException e) {
-                                DataDebugLog.logDebug("Fail Inserting Data: " + e.getMessage());
+                                DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Fail Inserting Data: " + e.getMessage());
+                                continue;
                             }
                         }
-
+                        modified++;
 
                         if (modified % batchSize == 0) {
                             try {
                                 statement.executeBatch();
                                 statement.clearBatch();
-
-                                DataDebugLog.logDebug("Success executing batch of " + modified);
-
+                                DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Success executing batch of " + modified);
                             } catch (SQLException e) {
-                                DataDebugLog.logDebug("Failed executing batch: " + e.getMessage());
+                                DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Failed executing batch: " + e.getMessage());
                             }
                         }
                     }
-                    DataDebugLog.logDebug("Executing Last batch of " + modified);
+                    DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Executing Last batch of " + modified);
                     statement.executeBatch();
-
+                    statement.clearBatch();
                     connection.commit(); // Commit the transaction
                 } catch (SQLException e) {
                     connection.rollback();
@@ -167,83 +179,10 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
                 connection.setAutoCommit(true);
 
                 future.complete(saved);
-                DataDebugLog.logDebug("Saved Loaded, Modified " + modified + " users.");
+                DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Saved Loaded, Modified " + modified + " users.");
                 return true;
             }
-        }, executor));
-        return future;
-    }*/
-
-    @Override
-    public <S extends Iterable<T>> CompletableFuture<List<T>> saveLoaded(S loaded, boolean async) {
-        Executor executor = getExecutor(async);
-        CompletableFuture<List<T>> future = new CompletableFuture<>();
-
-        getConnectionQueue().addConnectionRequest(new ConnectionRequest<>(connection -> {
-            List<T> saved = new ArrayList<>();
-
-            int modified = 0;
-
-            try (PreparedStatement updateStmt = connection.prepareStatement(updatePreparedStatement(getTableStructure()));
-                 PreparedStatement insertStmt = connection.prepareStatement(insertPreparedStatement(getTableStructure()))) {
-
-                connection.setAutoCommit(false);
-                int batchCount = 0;
-
-                Map<Object, Boolean> existingEntries = cacheExistingEntries(connection, loaded);
-
-                for (T object : loaded) {
-                    DataDebugLog.logDebug("Saving Loaded: " + object.getKey());
-
-                    SerializedData data = new SerializedData();
-                    getSerializer().serialize(object, data);
-
-                    DatabaseStructure needsUpdate = buildNeedsUpdate(object, data);
-
-                    // If the size is 1, it should only contain the key.
-                    if (needsUpdate.getColumnValues().size() == 1) {
-                        DataDebugLog.logDebug("Needs update contains no data values. no need for updating");
-                        continue;
-                    }
-                    modified++;
-                    DatabaseStructure modifiedStructure = data.toDatabaseStructure(getTableStructure());
-
-                    boolean exists = existingEntries.containsKey(modifiedStructure.getFirstValuePair().getKey());
-                    PreparedStatement batchStmt = exists ? updateStmt : insertStmt;
-                    addBatch(batchStmt, modifiedStructure);
-
-                    saved.add(object);
-                    batchCount++;
-
-                    // Execute batch every 'batchSize' entries
-                    if (batchCount % batchSize == 0) {
-                        executeAndClearBatch(updateStmt, insertStmt);
-                        DataDebugLog.logDebug("Executed batch of " + batchSize);
-                    }
-                }
-
-                // Execute the final batch
-                executeAndClearBatch(updateStmt, insertStmt);
-                connection.commit();
-                DataDebugLog.logDebug("Executed final batch and committed.");
-                DataDebugLog.logDebug("Saved Loaded, Modified " + modified + " users.");
-                future.complete(saved);
-            } catch (SQLException e) {
-                try {
-                    connection.rollback();
-                    DataDebugLog.logDebug("Transaction rolled back due to error: " + e.getMessage());
-                } catch (SQLException rollbackEx) {
-                    DataDebugLog.logDebug("Rollback failed: " + rollbackEx.getMessage());
-                }
-            } finally {
-                try {
-                    connection.setAutoCommit(true);
-                } catch (SQLException e) {
-                    DataDebugLog.logDebug("Failed to reset auto-commit: " + e.getMessage());
-                }
-            }
-            return true;
-        }, executor));
+        }, useRunner ? executor : null));
         return future;
     }
 
@@ -260,7 +199,7 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
                 try {
                     for (T object : list) {
 
-                        DataDebugLog.logDebug("Saving List: " + object.getKey());
+                        DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Saving List: " + object.getKey());
 
                         SerializedData data = new SerializedData();
                         getSerializer().serialize(object, data);
@@ -269,7 +208,7 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
 
                         // If the size is 1, it should only contain the key.
                         if (needsUpdate.getColumnValues().size() == 1) {
-                            DataDebugLog.logDebug("Needs update contains no data values. no need for updating");
+                            DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Needs update contains no data values. no need for updating");
                             continue;
                         }
 
@@ -278,19 +217,19 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
                         if (doesEntryExist(connection, modifiedStructure.getFirstValuePair())) {
 
                             try {
-                                DataDebugLog.logDebug("Adding Update Batch Statement");
+                                DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Adding Update Batch Statement");
                                 statement.addBatch(updateStatement(needsUpdate));
                                 saved.add(object);
                             } catch (SQLException e) {
-                                DataDebugLog.logDebug("Failed adding batch Data: " + e.getMessage());
+                                DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Failed adding batch Data: " + e.getMessage());
                             }
                         } else {
                             try {
-                                DataDebugLog.logDebug("Adding Insert Batch Statement");
+                                DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Adding Insert Batch Statement");
                                 statement.addBatch(insertStatement(modifiedStructure));
                                 saved.add(object);
                             } catch (SQLException e) {
-                                DataDebugLog.logDebug("Fail Inserting Data: " + e.getMessage());
+                                DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Fail Inserting Data: " + e.getMessage());
                             }
                         }
 
@@ -300,14 +239,14 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
                                 statement.executeBatch();
                                 statement.clearBatch();
 
-                                DataDebugLog.logDebug("Success executing batch of " + modified);
+                                DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Success executing batch of " + modified);
 
                             } catch (SQLException e) {
-                                DataDebugLog.logDebug("Failed executing batch: " + e.getMessage());
+                                DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Failed executing batch: " + e.getMessage());
                             }
                         }
                     }
-                    DataDebugLog.logDebug("Executing Last batch of " + modified);
+                    DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Executing Last batch of " + modified);
                     statement.executeBatch();
 
                     connection.commit(); // Commit the transaction
@@ -317,7 +256,7 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
                 connection.setAutoCommit(true);
 
                 future.complete(saved);
-                DataDebugLog.logDebug("Saved List, Modified " + modified + " users.");
+                DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Saved List, Modified " + modified + " users.");
                 return true;
             }
         }, executor));
@@ -335,7 +274,7 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
         DatabaseStructure needsUpdate = buildNeedsUpdate(object, data);
         // If the size is 1, it should only contain the key.
         if (needsUpdate.getColumnValues().size() == 1) {
-            DataDebugLog.logDebug("Needs update contains no data values. no need for updating");
+            DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Needs update contains no data values. no need for updating");
             return null;
         }
 
@@ -345,16 +284,16 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
             if (doesEntryExist(connection, modifiedStructure.getFirstValuePair())) {
                 try {
                     connection.createStatement().executeUpdate(updateStatement(needsUpdate));
-                    DataDebugLog.logDebug("Success Updating Data");
+                    DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Success Updating Data");
                 } catch (SQLException e) {
-                    DataDebugLog.logDebug("Fail Updating Data: " + e.getMessage());
+                    DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Fail Updating Data: " + e.getMessage());
                 }
             } else {
                 try {
                     connection.createStatement().executeUpdate(insertStatement(modifiedStructure));
-                    DataDebugLog.logDebug("Success Inserting Data");
+                    DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Success Inserting Data");
                 } catch (SQLException e) {
-                    DataDebugLog.logDebug("Fail Inserting Data: " + e.getMessage());
+                    DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Fail Inserting Data: " + e.getMessage());
                 }
             }
             future.complete(object);
@@ -366,6 +305,11 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
 
     @Override
     public <K> CompletableFuture<T> load(Storage<K, T> holder, DataEntry<String, K> key, boolean async) {
+        return load(holder, key, async, false);
+    }
+
+    @Override
+    public <K> CompletableFuture<T> load(Storage<K, T> holder, DataEntry<String, K> key, boolean async, boolean persist) {
         Executor executor = getExecutor(async);
         CompletableFuture<T> future = new CompletableFuture<>();
 
@@ -391,7 +335,7 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
                 serializedData.fromQuery(data);
                 T dummy = getSerializer().deserialize(holder.get(key.getValue()), serializedData);
                 loadIntoCache(dummy, serializedData);
-                holder.add(dummy);
+                holder.add(dummy, persist);
                 future.complete(dummy);
             } catch (SQLException e) {
                 DataDebugLog.logError("Failed To Load user: ", e);
@@ -400,49 +344,6 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
         }, executor));
         return future;
     }
-
-/*    @Override
-    public <K> CompletableFuture<List<T>> loadAll(Storage<K, T> holder, boolean async) {
-        Executor executor = getExecutor(async);
-        CompletableFuture<List<T>> future = new CompletableFuture<>(); // creates a future here
-
-        executeRequest(new ConnectionRequest<>(conn -> {
-            List<T> loaded = new ArrayList<>();
-            try (PreparedStatement stmt = conn.prepareStatement("SELECT * FROM " + credential.getTableName())) {
-                ResultSet rs = stmt.executeQuery();
-                while (rs.next()) {
-                    List<StorageValue> data = new LinkedList<>();
-                    int column = 1;
-                    for (Map.Entry<String, SQLColumnType> entry : getTableStructure().getColumnStructure().entrySet()) {
-                        //todo dont call rs.getMetaData
-                        SQLColumnType columnType = SQLColumnType.matchType(rs.getMetaData().getColumnTypeName(column));
-
-
-                        data.add(new StorageValue(entry.getKey(), rs.getObject(entry.getKey()), columnType));
-                        column++;
-                    }
-                    SerializedData serializedData = new SerializedData();
-                    serializedData.fromQuery(data);
-
-                    try {
-                        T dummy = getSerializer().deserialize(holder.get(serializedData.applyAs(data.get(0).getField(), holder.getKeyClass(), null)), serializedData);
-                        loadIntoCache(dummy, serializedData);
-                        holder.add(dummy);
-                        loaded.add(dummy);
-                    } catch (Exception exception) {
-                        DataDebugLog.logDebug("Failed to deserialize class, with data: " + serializedData);
-                        DataDebugLog.logError(exception.getMessage());
-                    }
-                }
-            } catch (SQLException e) {
-                DataDebugLog.logError("Failed To Load All users" + e.getMessage());
-            }
-
-            future.complete(loaded);
-            return null;
-        }, executor));
-        return future;
-    }*/
 
     @Override
     public <K> CompletableFuture<List<T>> loadAll(Storage<K, T> holder, boolean async) {
@@ -481,11 +382,9 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
                         loadIntoCache(dummy, serializedData);
                         holder.add(dummy);
                         loaded.add(dummy);
-       /*                 synchronized (loaded) { // Synchronize only if necessary
 
-                        }*/
                     } catch (Exception exception) {
-                        DataDebugLog.logDebug("Failed to deserialize class, with data: " + serializedData);
+                        DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Failed to deserialize class, with data: " + serializedData);
                         DataDebugLog.logError(exception.getMessage());
                     }
                 });
@@ -507,7 +406,6 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
             try (Statement stmt = conn.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY)) {
                 ResultSet rs = stmt.executeQuery("SELECT * FROM " + credential.getTableName() + " WHERE " + keyColumn + " = '" + keyValue + "' ;");
 
-                // Prepare static column type mappings to avoid repeated calls to ResultSet metadata
                 List<String> columnNames = new ArrayList<>();
                 List<SQLColumnType> columnTypes = new ArrayList<>();
                 for (Map.Entry<String, SQLColumnType> entry : getTableStructure().getColumnStructure().entrySet()) {
@@ -515,7 +413,6 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
                     columnTypes.add(SQLColumnType.matchType(entry.getValue().getSql()));
                 }
 
-                // Collect ResultSet rows in a batch list for parallel processing
                 List<List<StorageValue>> rowData = new ArrayList<>();
                 while (rs.next()) {
                     List<StorageValue> data = new ArrayList<>();
@@ -525,16 +422,15 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
                     rowData.add(data);
                 }
 
-                // Parallelize deserialization and loading into cache
                 rowData.parallelStream().forEach(data -> {
                     SerializedData serializedData = new SerializedData();
                     serializedData.fromQuery(data);
                     try {
-                        T entry = getSerializer().deserialize(construct(getVariant(credential.getTableName())), serializedData);
+                        T entry = getSerializer().deserialize(construct(getDataClass()), serializedData);
                         loadIntoCache(entry, serializedData);
                         loaded.add(entry);
                     } catch (Exception exception) {
-                        DataDebugLog.logDebug("Failed to deserialize class, with data: " + serializedData);
+                        DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Failed to deserialize class, with data: " + serializedData);
                         DataDebugLog.logError(exception.getMessage());
                     }
                 });
@@ -545,6 +441,68 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
             return null;
         }, executor));
         return future;
+    }
+
+    @Override
+    public CompletableFuture<List<SimpleStorageModel>> getSortedListByColumn(DatabaseStructure databaseStructure, String sortByColumnName, SortOrder sortOrder, int limit, int offset, boolean async) {
+        Executor executor = getExecutor(async);
+
+        CompletableFuture<List<SimpleStorageModel>> future = new CompletableFuture<>();
+        executeRequest(new ConnectionRequest<>(conn -> {
+            List<SimpleStorageModel> sortedList = new ArrayList<>();
+
+            StringBuilder builder = new StringBuilder();
+            builder.append("SELECT ");
+
+            for (String key : databaseStructure.getColumnStructure().keySet()) {
+                builder.append(key).append(",");
+            }
+            builder.setCharAt(builder.length() - 1, ' ');
+            builder
+                    .append("FROM ")
+                    .append(credential.getTableName())
+                    .append(" ORDER BY ")
+                    .append(sortByColumnName)
+                    .append(" ")
+                    .append(sortOrder == SortOrder.DESC ? "DESC" : "ASC")
+                    .append(" LIMIT ")
+                    .append(limit)
+                    .append(" OFFSET ")
+                    .append(offset);
+
+            try (Statement stmt = conn.createStatement()) {
+                ResultSet resultSet = stmt.executeQuery(builder.toString());
+                while (resultSet.next()) {
+                    SimpleStorageModel model = buildSimpleStorageModel(resultSet, databaseStructure);
+                    sortedList.add(model);
+                }
+            } catch (Exception e) {
+                DataDebugLog.logError("Failed to build sorted list: " + e.getMessage());
+            }
+            future.complete(sortedList);
+            return sortedList;
+        }, executor));
+
+        return future;
+    }
+
+    private SimpleStorageModel buildSimpleStorageModel(ResultSet rs, DatabaseStructure databaseStructure) throws SQLException {
+        SimpleStorageModel model = new SimpleStorageModel(rs.getString(databaseStructure.getKeyName()));
+        try {
+            for (Map.Entry<String, SQLColumnType> entry : databaseStructure.getColumnStructure().entrySet()) {
+                String colName = entry.getKey();
+                Object colVal = rs.getObject(colName);
+                model.addValue(colName, colVal);
+            }
+        } catch (Exception e) {
+            DataDebugLog.logError("Failed to build simple storage model: " + e.getMessage());
+
+        }
+        return model;
+    }
+
+    public enum SortOrder {
+        ASC, DESC
     }
 
     private DatabaseStructure buildNeedsUpdate(T object, SerializedData data) {
@@ -563,7 +521,7 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
             }
             if (!data.getValue(entry.getKey()).isPresent() || cachedData.isOutdated(column, value)) {
                 needsUpdate.addValue(column, getTableStructure().getColumnStructure().get(column), value);
-                DataDebugLog.logDebug("Needs Update: " + column + " " + value);
+                DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Needs Update: " + column + " " + value);
             }
         }
         return needsUpdate;
@@ -638,7 +596,7 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
         } catch (Exception e) {
             throw new IllegalStateException("Failed to confirm table, strange Column Types/Names.", e);
         }
-        DataDebugLog.logDebug("Table Needs Alter: " + needsAltering);
+        DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Table Needs Alter: " + needsAltering);
 
         return needsAltering;
     }
@@ -664,44 +622,31 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
         return dataMirrorArray;
     }
 
-    // Helper method to add batch to statement
-    private void addBatch(PreparedStatement stmt, DatabaseStructure structure) throws SQLException {
-        // Fill in statement parameters based on DatabaseStructure
-
-        int i = 1;
-        for (Map.Entry<String, Object> entry : structure.getColumnValues().entrySet()) {
-            stmt.setObject(i, entry.getValue());
-        }
-
-        // Example: stmt.setObject(1, structure.getColumnValue(...));
-        stmt.addBatch();
-    }
-
-    // Execute batch and clear
-    private void executeAndClearBatch(PreparedStatement... statements) throws SQLException {
-        for (PreparedStatement stmt : statements) {
-            stmt.executeBatch();
-            stmt.clearBatch();
-        }
-    }
-
     // Cache existing entries for fast lookup
-    private Map<Object, Boolean> cacheExistingEntries(Connection connection, Iterable<T> loaded) throws SQLException {
+    private Map<Object, Boolean> cacheExistingEntries(Connection connection) throws SQLException {
         Map<Object, Boolean> existingEntries = new HashMap<>();
-        String keyColumn = getTableStructure().getFirstValuePair().getKey();
+        String keyColumn = getTableStructure().getKeyName();
         try (PreparedStatement checkStmt = connection.prepareStatement("SELECT " + keyColumn + " FROM " + credential.getTableName())) {
             ResultSet rs = checkStmt.executeQuery();
             while (rs.next()) {
-                existingEntries.put(rs.getObject(keyColumn), true);
+                existingEntries.put(StorageUtil.fromObject(rs.getObject(keyColumn), getKeyClass()), true);
             }
         }
         return existingEntries;
     }
 
+    protected void executeBatchSafely(PreparedStatement statement, int count) {
+        try {
+            statement.executeBatch();
+            statement.clearBatch();
+            DataDebugLog.logDebug("Executed batch of " + count + " rows.");
+        } catch (SQLException ex) {
+            DataDebugLog.logDebug("Batch execution failed: " + ex.getMessage());
+        }
+    }
     public <S> void executeSQLRequest(ConnectionRequest<S> request) {
         executeRequest(request);
     }
-
 
     public abstract String createTableStatement(boolean force);
 
@@ -709,11 +654,7 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
 
     public abstract String insertStatement(DatabaseStructure modifiedStructure);
 
-    public abstract String insertPreparedStatement(DatabaseStructure modifiedStructure);
-
     public abstract String updateStatement(DatabaseStructure modifiedStructure);
-
-    public abstract String updatePreparedStatement(DatabaseStructure modifiedStructure);
 
     public abstract void dropTable();
 

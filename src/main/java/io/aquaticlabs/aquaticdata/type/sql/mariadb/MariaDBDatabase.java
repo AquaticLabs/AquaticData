@@ -206,17 +206,6 @@ public class MariaDBDatabase<T extends StorageModel> extends SQLDatabase<T> {
         return builder.toString();
     }
 
-
-    @Override
-    public String insertPreparedStatement(DatabaseStructure modifiedStructure) {
-        return null;
-    }
-
-    @Override
-    public String updatePreparedStatement(DatabaseStructure modifiedStructure) {
-        return null;
-    }
-
     @Override
     public void dropTable() {
         executeRequest(new ConnectionRequest<>(connection -> {
