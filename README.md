@@ -17,29 +17,34 @@ AquaticData is a lightweight, object-oriented data management library designed f
 ### Maven
 Add the following to your `pom.xml`:
 ```xml
-<repository>
-  //wip
-</repository>
+<repositories>
+		<repository>
+		    <id>jitpack.io</id>
+		    <url>https://jitpack.io</url>
+		</repository>
+	</repositories>
 
-<dependency>
-    <groupId>io.aquaticlabs</groupId>
-    <artifactId>aquaticdata</artifactId>
-    <version>2.1</version>
-</dependency>
+	<dependency>
+	    <groupId>com.github.AquaticLabs</groupId>
+	    <artifactId>AquaticData</artifactId>
+	    <version>2.1</version>
+	</dependency>
 ```
 
 ### Gradle
 Add the following to your `build.gradle`:
 ```gradle
-repositories {
-    maven {
-       //wip  url 
-    }
-}
+	dependencyResolutionManagement {
+		repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+		repositories {
+			mavenCentral()
+			maven { url 'https://jitpack.io' }
+		}
+	}
 
-dependencies {
-    implementation 'io.aquaticlabs:aquaticdata:2.1'
-}
+	dependencies {
+	        implementation 'com.github.AquaticLabs:AquaticData:2.1'
+	}
 ```
 
 ---
