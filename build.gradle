@@ -1,11 +1,11 @@
 plugins {
     id 'java'
+    id 'maven-publish'
     id "io.freefair.lombok" version "8.3"
 }
 
 group = 'io.aquaticlabs'
-version = '1.1'
-
+version = '1.2'
 
 repositories {
     mavenCentral()
@@ -44,4 +44,16 @@ dependencies {
 
 test {
     useJUnitPlatform()
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+
+            // Optional: Customize artifact information
+            groupId = 'io.aquaticlabs'
+            artifactId = 'AquaticData'
+            version = '1.2'
+        }
+    }
 }
