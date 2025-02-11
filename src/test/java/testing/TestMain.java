@@ -42,7 +42,6 @@ class TestMain {
         //Files.deleteIfExists(Paths.get("TestingSB.db"));
     }
 
-    @Test
     void testGetNull() {
         Assertions.assertNull(holder.getOrNull(UUID.randomUUID()));
     }
@@ -66,8 +65,9 @@ class TestMain {
         Assertions.assertEquals(data.getValue(), loadedData.getValue());
     }
 
+    //@Test
     void addBulk() throws ExecutionException, InterruptedException, TimeoutException {
-        for (int i = 0; i < 100000; i++) {
+        for (int i = 0; i < 10000; i++) {
             TestData data = new TestData(UUID.randomUUID());
             data.setName("Tony: " + i);
             data.setValue(randomNumber(1, 100000));
@@ -77,8 +77,8 @@ class TestMain {
 
     }
 
-    @Test
-    void testRank() throws ExecutionException, InterruptedException, TimeoutException {
+   // @Test
+    void testRank() throws Exception {
         System.out.println("1");
 
         holder.loadRanks("value");

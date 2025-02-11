@@ -102,6 +102,20 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
         return saveLoaded(loaded, async, true);
     }
 
+    /**
+     * Saves or updates a collection of loaded objects in the database using batch processing.
+     * If an object already exists (based on its key), it is updated; otherwise, a new entry is inserted.
+     * The method optimizes database calls by caching existing entries and executing batch updates.
+     * Transactions are committed after processing for efficiency.
+     *
+     * @param loaded    The collection of objects to be saved or updated.
+     * @param async     Whether to execute the operation asynchronously.
+     * @param useRunner Whether to use a dedicated executor for the operation.
+     * @param <S>       The iterable type that extends {@link Iterable} containing objects of type {@code T}.
+     * @return A {@link CompletableFuture} containing the list of successfully saved objects.
+     *
+     * @throws SQLException If an error occurs during batch execution or database operations.
+     */
     @Override
     public <S extends Iterable<T>> CompletableFuture<List<T>> saveLoaded(S loaded, boolean async, boolean useRunner) {
         Executor executor = getExecutor(async);
@@ -186,6 +200,17 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
         return future;
     }
 
+    /**
+     * Saves or updates a list of objects in the database using batch processing.
+     * If an object already exists (based on its key), it is updated; otherwise, a new entry is inserted.
+     * Batch execution is used for efficiency, and transactions are committed after processing.
+     *
+     * @param list  The list of objects to be saved or updated.
+     * @param async Whether to execute the operation asynchronously.
+     * @return A {@link CompletableFuture} containing the list of successfully saved objects.
+     *
+     * @throws SQLException If an error occurs during batch execution or database operations.
+     */
     @Override
     public CompletableFuture<List<T>> saveList(List<T> list, boolean async) {
         Executor executor = getExecutor(async);
@@ -263,6 +288,17 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
         return future;
     }
 
+    /**
+     * Saves or updates the given object in the database.
+     * If the object already exists in the database (based on its key), the method updates it.
+     * Otherwise, it inserts a new entry.
+     *
+     * @param object The object of type {@code T} to be saved or updated.
+     * @param async  Whether to execute the operation asynchronously.
+     * @return A {@link CompletableFuture} containing the saved object.
+     *
+     * @throws SQLException If an error occurs while executing the SQL insert or update statement.
+     */
     @Override
     public CompletableFuture<T> save(T object, boolean async) {
         Executor executor = getExecutor(async);
@@ -303,11 +339,27 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
         return future;
     }
 
+
     @Override
     public <K> CompletableFuture<T> load(Storage<K, T> holder, DataEntry<String, K> key, boolean async) {
         return load(holder, key, async, false);
     }
 
+    /**
+     * Loads a single record from the database based on the provided key.
+     * If the entry exists, it retrieves the corresponding row, deserializes the data,
+     * caches the result, and adds it to the provided storage holder.
+     *
+     * @param holder  The {@link Storage} instance where the loaded record will be stored.
+     * @param key     The {@link DataEntry} containing the column name and key value to query.
+     * @param async   Whether to execute the query asynchronously.
+     * @param persist Whether to persist the loaded entry in storage.
+     * @param <K>     The key type of the storage holder.
+     * @return A {@link CompletableFuture} containing the deserialized object of type {@code T}, or {@code null} if not found.
+     *
+     * @throws SQLException If an error occurs while executing the SQL query.
+     * @throws Exception    If deserialization of the query result fails.
+     */
     @Override
     public <K> CompletableFuture<T> load(Storage<K, T> holder, DataEntry<String, K> key, boolean async, boolean persist) {
         Executor executor = getExecutor(async);
@@ -345,6 +397,19 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
         return future;
     }
 
+    /**
+     * Loads all records from the database into the specified storage holder.
+     * This method retrieves all rows from the table, deserializes the data, and caches the results.
+     * It uses batch processing and parallel streams for efficient handling of large datasets.
+     *
+     * @param holder The {@link Storage} instance where the loaded records will be stored.
+     * @param async  Whether to execute the query asynchronously.
+     * @param <K>    The key type of the storage holder.
+     * @return A {@link CompletableFuture} containing a list of deserialized objects of type {@code T}.
+     *
+     * @throws SQLException If an error occurs while executing the SQL query.
+     * @throws Exception    If deserialization of query results fails.
+     */
     @Override
     public <K> CompletableFuture<List<T>> loadAll(Storage<K, T> holder, boolean async) {
         Executor executor = getExecutor(async);
@@ -397,6 +462,21 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
         return future;
     }
 
+
+
+    /**
+     * Retrieves a list of objects from the database based on a specific key column and value.
+     * This method queries the database for rows where the specified key column matches the given key value,
+     * deserializes the results, and loads them into a list.
+     *
+     * @param keyColumn The column name to filter the query results.
+     * @param keyValue  The value to match in the specified key column.
+     * @param async     Whether to execute the query asynchronously.
+     * @return A {@link CompletableFuture} containing a list of deserialized objects of type {@code T}.
+     *
+     * @throws SQLException If an error occurs while executing the SQL query.
+     * @throws Exception    If deserialization of query results fails.
+     */
     @Override
     public CompletableFuture<List<T>> getKeyedList(String keyColumn, String keyValue, boolean async) {
         Executor executor = getExecutor(async);
@@ -443,6 +523,21 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
         return future;
     }
 
+
+    /**
+     * Retrieves a sorted list of {@link SimpleStorageModel} objects from the database based on a specified column.
+     * This method constructs a SQL query to fetch and sort records according to the given column, order, limit, and offset.
+     *
+     * @param databaseStructure The structure of the database table, defining column metadata.
+     * @param sortByColumnName  The name of the column to sort the results by.
+     * @param sortOrder         The sorting order, either {@link SortOrder#ASC} or {@link SortOrder#DESC}.
+     * @param limit             The maximum number of records to retrieve.
+     * @param offset            The number of records to skip before retrieving results.
+     * @param async             Whether to execute the query asynchronously.
+     * @return A {@link CompletableFuture} containing a list of sorted {@link SimpleStorageModel} objects.
+     *
+     * @throws Exception If an error occurs while executing the SQL query or processing the results.
+     */
     @Override
     public CompletableFuture<List<SimpleStorageModel>> getSortedListByColumn(DatabaseStructure databaseStructure, String sortByColumnName, SortOrder sortOrder, int limit, int offset, boolean async) {
         Executor executor = getExecutor(async);
@@ -644,6 +739,7 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
             DataDebugLog.logDebug("Batch execution failed: " + ex.getMessage());
         }
     }
+
     public <S> void executeSQLRequest(ConnectionRequest<S> request) {
         executeRequest(request);
     }

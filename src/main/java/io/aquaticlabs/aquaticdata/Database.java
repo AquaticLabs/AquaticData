@@ -95,6 +95,10 @@ public abstract class Database<T extends StorageModel> {
                 .newInstance();
     }
 
+    public <S> void addExecuteRequest(ConnectionRequest<S> connectionRequest) {
+        getConnectionQueue().addConnectionRequest(connectionRequest);
+    }
+
     public abstract <S> S executeRequest(ConnectionRequest<S> connectionRequest);
 
     public abstract <K> void start(Storage<K, T> holder);

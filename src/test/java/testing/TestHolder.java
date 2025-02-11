@@ -11,6 +11,7 @@ import io.aquaticlabs.aquaticdata.type.DataCredential;
 import io.aquaticlabs.aquaticdata.type.sql.SQLColumnType;
 import io.aquaticlabs.aquaticdata.type.sql.SQLDatabase;
 import io.aquaticlabs.aquaticdata.util.DataEntry;
+import io.aquaticlabs.aquaticdata.util.MutableSingle;
 import testing.newtest.LogData;
 
 import java.sql.PreparedStatement;
@@ -163,9 +164,9 @@ public class TestHolder extends StorageHolder<UUID, TestData> {
         return super.getSortedListByColumn(structure, sortColumn, SQLDatabase.SortOrder.DESC, 50, 0, true);
     }
 
-    public void loadRanks(String statValue) throws ExecutionException, InterruptedException, TimeoutException {
+/*    public void loadRanks(String statValue) throws ExecutionException, InterruptedException, TimeoutException {
         CompletableFuture<Boolean> future = new CompletableFuture<>();
-        executeRequest(new ConnectionRequest<>((connection -> {
+        addExecuteRequest(new ConnectionRequest<>((connection -> {
             try (PreparedStatement statement = connection.prepareStatement(buildUpdateRankQuery(statValue))) {
                 statement.executeUpdate();
             } catch (SQLException e) {
@@ -178,6 +179,58 @@ public class TestHolder extends StorageHolder<UUID, TestData> {
         future.get(10, TimeUnit.SECONDS);
     }
 
+    private String buildUpdateRankQuery(String columnName) {
+        String tableName = credential.getTableName();
+
+        return String.format("WITH cte AS (SELECT *, ROW_NUMBER() OVER (ORDER BY %s DESC) rn FROM %s) " +
+                        "UPDATE %s SET %s_rank = (SELECT rn FROM cte c WHERE (c.uuid, c.%s_rank) = (%s.uuid, %s.%s_rank))",
+                columnName, tableName, tableName, columnName, columnName, tableName, tableName, columnName);
+    }
+    */
+    private static final int BATCH_SIZE = 500;
+
+    public void loadRanks(String statValue) throws Exception {
+        String tableName = credential.getTableName();
+        final MutableSingle<Integer> offset = new MutableSingle<>(0);
+
+        while (true) {
+            CompletableFuture<Boolean> future = new CompletableFuture<>();
+            addExecuteRequest(new ConnectionRequest<>((connection -> {
+                String batchQuery = buildBatchUpdateRankQuery(statValue, tableName, offset.get(), BATCH_SIZE);
+                System.out.println(batchQuery);
+                try (PreparedStatement statement = connection.prepareStatement(batchQuery)) {
+                    int rowsUpdated = statement.executeUpdate();
+                    if (rowsUpdated < BATCH_SIZE) {
+                        future.complete(false); // No more batches left
+                    } else {
+                        future.complete(true);
+                    }
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+                return null;
+            }), CompletableFuture::runAsync));
+
+
+            if (!future.get(10, TimeUnit.SECONDS)) {
+                break; // Exit loop if no more rows to process
+            }
+            offset.set(offset.get() + BATCH_SIZE);
+
+            System.out.println("batch done: " + offset.get());
+        }
+    }
+
+    private String buildBatchUpdateRankQuery(String columnName, String tableName, int offset, int limit) {
+        return String.format(
+                "WITH cte AS (" +
+                        "SELECT uuid, ROW_NUMBER() OVER (ORDER BY %s DESC) AS rn " +
+                        "FROM %s LIMIT %d OFFSET %d" +
+                        ") " +
+                        "UPDATE %s SET %s_rank = COALESCE((SELECT rn FROM cte WHERE cte.uuid = %s.uuid), 0);",
+                columnName, tableName, limit, offset, tableName, columnName, tableName
+        );
+    }
     public int getRank(UUID uuid) throws ExecutionException, InterruptedException, TimeoutException {
         CompletableFuture<Integer> future = new CompletableFuture<>();
         executeRequest(new ConnectionRequest<>((connection -> {
@@ -194,13 +247,6 @@ public class TestHolder extends StorageHolder<UUID, TestData> {
         return future.get(10, TimeUnit.SECONDS);
     }
 
-    private String buildUpdateRankQuery(String columnName) {
-        String tableName = credential.getTableName();
-
-        return String.format("WITH cte AS (SELECT *, ROW_NUMBER() OVER (ORDER BY %s DESC) rn FROM %s) " +
-                "UPDATE %s SET %s_rank = (SELECT rn FROM cte c WHERE (c.uuid, c.%s_rank) = (%s.uuid, %s.%s_rank))",
-                columnName, tableName, tableName, columnName, columnName, tableName, tableName, columnName);
-    }
 
 
     public void saveAll(boolean async) throws ExecutionException, InterruptedException, TimeoutException {

@@ -148,6 +148,10 @@ public abstract class StorageHolder<K, T extends StorageModel> extends Storage<K
         database.executeRequest(connectionRequest);
     }
 
+    protected void addExecuteRequest(ConnectionRequest<?> connectionRequest) {
+        database.addExecuteRequest(connectionRequest);
+    }
+
     protected void dropTable() {
         if (database instanceof SQLDatabase) {
             SQLDatabase<?> db = (SQLDatabase<?>) database;
