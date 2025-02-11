@@ -76,11 +76,6 @@ You'll also want to create a holder class object that can manage all your data o
 ```
 
 2. **Define Data Models**:
-```java
-   // Creating your data holder class:
-   public class ObjectHolder extends StorageHolder<UUID, SavableObject> {
-=======
-
 ObjectHolder.java
 ```java
 public class ObjectHolder extends StorageHolder<UUID, SavableObject> {
@@ -138,7 +133,6 @@ public class ObjectHolder extends StorageHolder<UUID, SavableObject> {
 }
 
 ```
-=======
 
 SavableObject.java
 ```java
@@ -164,7 +158,7 @@ public class SavableObject implements StorageModel {
 
 
 3. **Perform Operations**:
-   ```java
+```java
    // You'll want to setup some getters inside your holder to retrieve data from either your dataMap or if you dont store the data, you'll want to fetch the data by running load(key)
 
    SavableObject savableObject = holder.getObject(uuid);
@@ -189,7 +183,7 @@ public class SavableObject implements StorageModel {
           statement.executeUpdate();
       }
    }));
-   ```
+```
 4. **Shutdown**:
 
 ```java
@@ -230,7 +224,4 @@ This project is licensed under the [MIT License](https://github.com/AquaticLabs/
 ---
 
 Thank you for using AquaticData! 🚀
-
-=======
-```
 
