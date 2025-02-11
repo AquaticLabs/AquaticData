@@ -7,6 +7,11 @@ plugins {
 group = 'io.aquaticlabs'
 version = '1.2'
 
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(11)) // Ensure compatibility
+    }
+}
 repositories {
     mavenCentral()
     mavenLocal()
