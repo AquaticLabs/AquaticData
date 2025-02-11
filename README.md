@@ -79,6 +79,11 @@ You'll also want to create a holder class object that can manage all your data o
 ```java
    // Creating your data holder class:
    public class ObjectHolder extends StorageHolder<UUID, SavableObject> {
+=======
+
+ObjectHolder.java
+```java
+public class ObjectHolder extends StorageHolder<UUID, SavableObject> {
 
     private final Map<UUID, SavableObject> dataMap = new ConcurrentHashMap<>();
 
@@ -133,9 +138,10 @@ You'll also want to create a holder class object that can manage all your data o
 }
 
 ```
+=======
 
+SavableObject.java
 ```java
-// Simple data class
 @Getter @Setter
 public class SavableObject implements StorageModel {
 
@@ -153,7 +159,6 @@ public class SavableObject implements StorageModel {
         return uuid;
     }
 }
-
  
 ```
 
@@ -225,4 +230,7 @@ This project is licensed under the [MIT License](https://github.com/AquaticLabs/
 ---
 
 Thank you for using AquaticData! 🚀
+
+=======
+```
 
