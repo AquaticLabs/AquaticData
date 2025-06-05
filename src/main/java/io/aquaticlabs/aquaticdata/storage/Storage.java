@@ -17,7 +17,7 @@ import io.aquaticlabs.aquaticdata.model.Serializer;
 import io.aquaticlabs.aquaticdata.model.StorageModel;
 import io.aquaticlabs.aquaticdata.tasks.RepeatingTask;
 import io.aquaticlabs.aquaticdata.tasks.TaskFactory;
-import io.aquaticlabs.aquaticdata.util.ConstuctorFailThrowable;
+import io.aquaticlabs.aquaticdata.util.ConstructorFailThrowable;
 import lombok.Getter;
 import lombok.Setter;
 
