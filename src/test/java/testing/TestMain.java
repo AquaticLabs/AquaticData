@@ -3,6 +3,7 @@ package testing;
 
 import io.aquaticlabs.aquaticdata.model.SimpleStorageModel;
 import io.aquaticlabs.aquaticdata.tasks.TaskFactory;
+import io.aquaticlabs.aquaticdata.type.json.JsonCredential;
 import io.aquaticlabs.aquaticdata.type.sql.sqlite.SQLiteCredential;
 import io.aquaticlabs.aquaticdata.util.DataDebugLog;
 import org.junit.jupiter.api.AfterEach;
@@ -33,7 +34,7 @@ class TestMain {
     void setup() {
         DataDebugLog.setDebug(true);
 
-        holder = new TestHolder(new SQLiteCredential("TestingSB", "TestingTable", new File("")));
+        holder = new TestHolder(new JsonCredential("TestingSB", "TestingTable", new File( "data.json")));
     }
 
     @AfterEach
@@ -42,6 +43,7 @@ class TestMain {
         //Files.deleteIfExists(Paths.get("TestingSB.db"));
     }
 
+    @Test
     void testGetNull() {
         Assertions.assertNull(holder.getOrNull(UUID.randomUUID()));
     }
@@ -50,7 +52,7 @@ class TestMain {
         Assertions.assertNotNull(holder.loadIntoCache(UUID.fromString("f911d440-583e-4131-91ad-3e8b62dda1a1")));
     }
 
-
+    @Test
     void addEntry() {
         TestData data = new TestData(UUID.randomUUID());
         data.setName("Jeff");
@@ -77,7 +79,7 @@ class TestMain {
 
     }
 
-   // @Test
+    // @Test
     void testRank() throws Exception {
         System.out.println("1");
 
@@ -128,10 +130,24 @@ class TestMain {
             return min + i.nextInt(max - min);
         }
     }
+    @Test
+    void dataExists() {
+        TestData data = holder.get(UUID.fromString("3a566fd7-8c08-44f9-80a8-983df9a54ff2"));
+        System.out.println(holder.getDataMap().size());
+
+        if (data != null) {
+            System.out.println(data.toString());
+        }
+        Assertions.assertNotNull(data);
+
+        Assertions.assertEquals(69, data.getValue());
+
+    }
+
 
     void loadValueAndTimeOut() {
 
-        TestData data = holder.loadIntoCache(UUID.fromString("c18762e4-a8f6-4e6a-8ed4-ea5e9e4f74ef"));
+        TestData data = holder.loadIntoCache(UUID.fromString("1aba0a33-ee9d-4b4e-ad4f-a15236f3800e"));
 
         Assertions.assertEquals("Jeff", data.getName());
 

@@ -12,6 +12,7 @@ import io.aquaticlabs.aquaticdata.type.sql.SQLColumnType;
 import io.aquaticlabs.aquaticdata.type.sql.SQLDatabase;
 import io.aquaticlabs.aquaticdata.util.DataEntry;
 import io.aquaticlabs.aquaticdata.util.MutableSingle;
+import lombok.Getter;
 import testing.newtest.LogData;
 
 import java.sql.PreparedStatement;
@@ -36,16 +37,18 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class TestHolder extends StorageHolder<UUID, TestData> {
 
+    @Getter
     private Map<UUID, TestData> dataMap = new ConcurrentHashMap<>();
     private DataCredential credential;
 
     public TestHolder(DataCredential credential) {
-        super(credential, UUID.class, TestData.class, StorageMode.CACHE, CompletableFuture::runAsync, Runnable::run);
+        super(credential, UUID.class, TestData.class, StorageMode.LOAD_AND_STORE, CompletableFuture::runAsync, Runnable::run);
         this.credential = credential;
-        setCacheSaveTime(60L * 10);
+/*        setCacheSaveTime(60L * 10);
         setCacheSaveMode(CacheSaveMode.TIME);
-        setCacheTimeOutTime(5);
+        setCacheTimeOutTime(5);*/
         loadDatabase();
+        loadAll(false);
     }
 
     public TestData getOrNull(UUID uuid) {
@@ -58,7 +61,7 @@ public class TestHolder extends StorageHolder<UUID, TestData> {
             return data;
         }
         add(data, true);
-       // save(data, true);
+        save(data, true);
         return data;
     }
 
@@ -71,7 +74,7 @@ public class TestHolder extends StorageHolder<UUID, TestData> {
             if (data == null) {
                 // Data doesn't exist, make it.
                 data = new TestData(uuid);
-                onAdd(data);
+                add(data);
                 save(data, true);
                 return data;
             }
@@ -116,6 +119,7 @@ public class TestHolder extends StorageHolder<UUID, TestData> {
         structure.addColumn("uuid", SQLColumnType.VARCHAR_UUID);
         structure.addColumn("name", SQLColumnType.VARCHAR_64);
         structure.addColumn("value", SQLColumnType.INTEGER, 0);
+        structure.addColumn("value2", SQLColumnType.INTEGER, 0);
         structure.addColumn("value_rank", SQLColumnType.INTEGER, 0);
 
 
@@ -143,6 +147,7 @@ public class TestHolder extends StorageHolder<UUID, TestData> {
             data.write("uuid", model.getKey());
             data.write("name", model.getName());
             data.write("value", model.getValue());
+            data.write("value2", model.getValue2());
         }).deserializer((model, data) -> {
             if (model == null) {
                 model = new TestData();
@@ -150,6 +155,8 @@ public class TestHolder extends StorageHolder<UUID, TestData> {
             model.setKey(data.applyAs("uuid", UUID.class));
             model.setName(data.applyAs("name", String.class));
             model.setValue(data.applyAs("value", Integer.class));
+            model.setValue2(data.applyAs("value2", Integer.class, () -> 5));
+
             return model;
         });
     }

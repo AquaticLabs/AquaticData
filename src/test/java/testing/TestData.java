@@ -17,6 +17,7 @@ public class TestData implements StorageModel {
     private UUID key;
     private String name;
     private int value;
+    private int value2 = 5;
 
 
     public TestData() {
@@ -29,5 +30,14 @@ public class TestData implements StorageModel {
     @Override
     public UUID getKey() {
         return key;
+    }
+
+    @Override
+    public String toString() {
+        return "TestData{" +
+                "key=" + key +
+                ", name='" + name + '\'' +
+                ", value=" + value +
+                '}';
     }
 }

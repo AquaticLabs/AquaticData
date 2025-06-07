@@ -142,7 +142,7 @@ public class StorageUtil {
             }
         }
 
-        if (clazz == Integer.class) return Integer.parseInt(value);
+        if (clazz == Integer.class) return (int)Double.parseDouble(value);
         else if (clazz == Boolean.class) return value.toCharArray()[0] != '0';
         else if (clazz == Long.class) return Long.parseLong(value);
         else if (clazz == Float.class) return Float.parseFloat(value);

@@ -33,16 +33,18 @@ class NewTesting {
 
     LogDataHolder holder;
 
-    @BeforeEach
+/*    @BeforeEach
     void setup() {
         File dataFile = new File("G:\\Projects\\DataStuff");
         holder = new LogDataHolder(new SQLiteCredential("minealerts_data", "minealerts_log_data", dataFile));
-    }
+    }*/
 
+/*
     @AfterEach
     void tearDown() throws IOException {
         holder.close();
     }
+*/
 
 
 /*    @Test
@@ -51,7 +53,7 @@ class NewTesting {
     }
     */
 
-    @Test
+    //@Test
     void testLoadKey() throws ExecutionException, InterruptedException, TimeoutException {
         System.out.println("LoadKEY");
         CompletableFuture<List<LogData>> dataFuture = holder.loadUUIDData(UUID.fromString("a749ef94-6d09-43b4-9abe-48cf93bfa961"));
@@ -62,7 +64,7 @@ class NewTesting {
 
     }
 
-    @Test
+    //@Test
     void testLoadDates() {
         System.out.println("LoadDates");
 
@@ -90,7 +92,7 @@ class NewTesting {
 
     private final Set<String> userNames = new HashSet<>();
 
-    @Test
+    //@Test
     void testLoadNames() {
         System.out.println("LoadDates");
 
@@ -111,7 +113,7 @@ class NewTesting {
     }
 
 
-    @Test
+   // @Test
     void testCheckData() throws ExecutionException, InterruptedException, TimeoutException {
 
         CompletableFuture<List<LogData>> dataFuture = holder.loadUUIDData(UUID.fromString("a749ef94-6d09-43b4-9abe-48cf93bfa961"));
