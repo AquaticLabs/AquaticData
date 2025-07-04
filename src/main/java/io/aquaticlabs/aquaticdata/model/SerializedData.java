@@ -1,6 +1,8 @@
 package io.aquaticlabs.aquaticdata.model;
 
 import io.aquaticlabs.aquaticdata.DatabaseStructure;
+import io.aquaticlabs.aquaticdata.type.ColumnData;
+import io.aquaticlabs.aquaticdata.type.sql.SQLColumnData;
 import io.aquaticlabs.aquaticdata.type.sql.SQLColumnType;
 import io.aquaticlabs.aquaticdata.util.StorageUtil;
 import lombok.Getter;
@@ -61,9 +63,11 @@ public class SerializedData {
     }
 
     public DatabaseStructure toDatabaseStructure(DatabaseStructure tableStructure) {
-        DatabaseStructure structure = new DatabaseStructure(tableStructure.getTableName());
-        for (Map.Entry<String, SQLColumnType> entry : tableStructure.getColumnStructure().entrySet()) {
-            structure.addValue(entry.getKey(), entry.getValue(), applyAs(entry.getKey(), String.class));
+        DatabaseStructure structure = new DatabaseStructure();
+        structure.setTableName(tableStructure.getTableName());
+        for (Map.Entry<String, ColumnData<?>> entry : tableStructure.getColumnStructure().entrySet()) {
+            String value = applyAs(entry.getKey(), String.class) + "";
+            structure.addValue(entry.getKey(), new SQLColumnData<>(value));
         }
         return structure;
     }

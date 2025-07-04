@@ -8,6 +8,8 @@ import io.aquaticlabs.aquaticdata.model.Serializer;
 import io.aquaticlabs.aquaticdata.model.StorageModel;
 import io.aquaticlabs.aquaticdata.model.StorageValue;
 import io.aquaticlabs.aquaticdata.queue.ConnectionRequest;
+import io.aquaticlabs.aquaticdata.type.ColumnData;
+import io.aquaticlabs.aquaticdata.type.sql.SQLColumnData;
 import io.aquaticlabs.aquaticdata.type.sql.SQLColumnType;
 import io.aquaticlabs.aquaticdata.type.sql.SQLDatabase;
 import io.aquaticlabs.aquaticdata.util.DataDebugLog;
@@ -61,21 +63,27 @@ public class SQLiteDatabase<T extends StorageModel> extends SQLDatabase<T> {
                 .append(" (");
 
         boolean first = true;
-        for (Map.Entry<String, SQLColumnType> entry : getTableStructure().getColumnStructure().entrySet()) {
+
+
+        for (Map.Entry<String, ColumnData<?>> entry : getTableStructure().getColumnStructure().entrySet()) {
+            String sqlValueKey = entry.getKey();
+            SQLColumnData<?> sqlColumnData = (SQLColumnData<?>) entry.getValue();
+            String sqlValueTypeString = sqlColumnData.getColumnType().getSql();
+
             if (first) {
                 builder
-                        .append(entry.getKey())
+                        .append(sqlValueKey)
                         .append(" ")
-                        .append(entry.getValue().getSql())
+                        .append(sqlValueTypeString)
                         .append(" PRIMARY KEY");
                 first = false;
                 continue;
             }
             builder
                     .append(", ")
-                    .append(entry.getKey())
+                    .append(sqlValueKey)
                     .append(" ")
-                    .append(entry.getValue().getSql())
+                    .append(sqlValueTypeString)
                     .append(" NOT NULL");
         }
         builder.append(") ");
@@ -93,7 +101,7 @@ public class SQLiteDatabase<T extends StorageModel> extends SQLDatabase<T> {
     }
 
     @Override
-    protected void correctColumns(Connection connection, Set<String> removeColumns, Map<String, SQLColumnType> retypeColumns, Map<String, String> moveColumns, Map<String, Map.Entry<String, SQLColumnType>> addColumns) {
+    protected void correctColumns(Connection connection, Set<String> removeColumns, Map<String, SQLColumnType> retypeColumns, Map<String, String> moveColumns, Map<String, Map.Entry<String, SQLColumnData<?>>> addColumns) {
         long loadStart = System.currentTimeMillis();
 
         String tempTableName = "FCtempTable";
@@ -130,7 +138,7 @@ public class SQLiteDatabase<T extends StorageModel> extends SQLDatabase<T> {
             List<String> matchingColumns = getMatchingColumns(connection, tempTableName, targetTable);
 
             if (matchingColumns.isEmpty()) {
-                System.out.println("No matching columns found between the tables.");
+                DataDebugLog.logDebug("No matching columns found between the tables.");
                 return;
             }
             copyData(connection, tempTableName, targetTable);
@@ -154,7 +162,7 @@ public class SQLiteDatabase<T extends StorageModel> extends SQLDatabase<T> {
 
         long loadEnd = System.currentTimeMillis();
         long loadElapsedTime = loadEnd - loadStart;
-        System.out.println("Data Conversion Loading time: " + loadElapsedTime + "ms");
+        DataDebugLog.logDebug("Data Conversion Loading time: " + loadElapsedTime + "ms");
         //DataDebugLog.logDebug("Data Conversion Loading time: " + loadElapsedTime + "ms");
     }
 
@@ -178,7 +186,10 @@ public class SQLiteDatabase<T extends StorageModel> extends SQLDatabase<T> {
                 selectClause.append(targetColumn);
             } else {
                 // Otherwise, use the default value
-                Object defaultValue = getTableStructure().getColumnDefaults().getOrDefault(targetColumn, "");
+                SQLColumnData<?> columnData = (SQLColumnData<?>) getTableStructure().getColumnStructure().get(targetColumn);
+                Object defaultValue = (columnData != null) ? columnData.getDefaultValue() : "";
+
+
                 selectClause.append("'").append(defaultValue).append("' AS ").append(targetColumn);
             }
 
@@ -191,12 +202,12 @@ public class SQLiteDatabase<T extends StorageModel> extends SQLDatabase<T> {
                 targetTable, insertColumns, selectClause, sourceTable
         );
 
-        System.out.println(copyQuery);
+        DataDebugLog.logDebug(copyQuery);
 
         // Execute the query
         try (Statement stmt = connection.createStatement()) {
             int rowsCopied = stmt.executeUpdate(copyQuery);
-            System.out.println("Copied " + rowsCopied + " rows from " + sourceTable + " to " + targetTable);
+            DataDebugLog.logDebug("Copied " + rowsCopied + " rows from " + sourceTable + " to " + targetTable);
         }
     }
 
@@ -211,22 +222,6 @@ public class SQLiteDatabase<T extends StorageModel> extends SQLDatabase<T> {
         }
         return columns;
     }
-/*
-    private void copyData(Connection connection, String sourceTable, String targetTable, List<String> matchingColumns) throws SQLException {
-        String columnList = String.join(", ", matchingColumns);
-
-        String copyQuery = String.format(
-                "INSERT INTO %s (%s) SELECT %s FROM %s",
-                targetTable, columnList, columnList, sourceTable
-        );
-        System.out.println(copyQuery);
-
-        try (Statement stmt = connection.createStatement()) {
-            int rowsCopied = stmt.executeUpdate(copyQuery);
-            System.out.println("Copied " + rowsCopied + " rows from " + sourceTable + " to " + targetTable);
-        }
-    }
-*/
 
     private List<String> getMatchingColumns(Connection connection, String sourceTable, String targetTable) throws SQLException {
         List<String> sourceColumns = getTableColumns(connection, sourceTable);
@@ -241,226 +236,6 @@ public class SQLiteDatabase<T extends StorageModel> extends SQLDatabase<T> {
         }
         return matchingColumns;
     }
-/*
-    @Override
-    protected void correctColumns(Connection connection, Set<String> removeColumns, Map<String, SQLColumnType> retypeColumns, Map<String, String> moveColumns, Map<String, Map.Entry<String, SQLColumnType>> addColumns) {
-        long loadStart = System.currentTimeMillis();
-
-        String tempTableName = "FCtempTable";
-        String dropConflict = "DROP TABLE IF EXISTS " + tempTableName + ";";
-
-        try (PreparedStatement dropTempTable = connection.prepareStatement(dropConflict)) {
-            dropTempTable.executeUpdate();
-        } catch (SQLException ex) {
-            DataDebugLog.logDebug("Failed to drop temp table: " + ex.getMessage());
-        }
-
-        // Rename original table
-        String renameTableStmt = "ALTER TABLE " + getCredential().getTableName() + " RENAME TO " + tempTableName + ";";
-        try (PreparedStatement renameTable = connection.prepareStatement(renameTableStmt)) {
-            renameTable.executeUpdate();
-            DataDebugLog.logDebug("Table renamed to: " + tempTableName);
-        } catch (SQLException ex) {
-            DataDebugLog.logDebug("Failed to rename table: " + ex.getMessage());
-            return;
-        }
-
-        // Create the new table
-        try {
-            connection.createStatement().executeUpdate(createTableStatement(true));
-        } catch (SQLException ex) {
-            DataDebugLog.logDebug("Failed to create new table: " + ex.getMessage());
-            return;
-        }
-        String selectQuery2 = "INSERT INTO " + getTableStructure().getTableName() + " ";
-
-        try (Statement selectStatement = connection.createStatement();
-             ResultSet rs = selectStatement.executeQuery(selectQuery2)) {
-        } catch (SQLException e) {
-        }
-
-
-        // Migrate data from temp table to new table
-        String selectQuery = "SELECT * FROM " + tempTableName;
-        try (Statement selectStatement = connection.createStatement();
-             ResultSet rs = selectStatement.executeQuery(selectQuery)) {
-
-            connection.setAutoCommit(false); // Start transaction
-
-            String insertSQL = buildInsertStatementTemplate(getTableStructure().getColumnStructure());
-            try (PreparedStatement insertStatement = connection.prepareStatement(insertSQL)) {
-                int batchSize = getBatchSize();
-                int count = 0;
-
-                while (rs.next()) {
-                    setPreparedStatementValues(rs, insertStatement, getTableStructure().getColumnStructure());
-                    insertStatement.addBatch();
-                    count++;
-
-                    if (count % batchSize == 0) {
-                        executeBatchSafely(insertStatement, count);
-                    }
-                }
-
-                // Execute remaining batch
-                executeBatchSafely(insertStatement, count);
-
-                connection.commit(); // Commit transaction
-                DataDebugLog.logDebug("Data migration completed successfully.");
-            } catch (SQLException ex) {
-                DataDebugLog.logError("Error during batch execution: " + ex.getMessage());
-                connection.rollback();
-                throw ex; // Rethrow to ensure proper handling
-            }
-
-        } catch (SQLException ex) {
-            DataDebugLog.logError("Error during column correction: " + ex.getMessage());
-            try {
-                connection.rollback();
-            } catch (SQLException rollbackEx) {
-                DataDebugLog.logError("Failed to rollback transaction: " + rollbackEx.getMessage());
-            }
-        } finally {
-            try {
-                connection.setAutoCommit(true);
-            } catch (SQLException ex) {
-                DataDebugLog.logError("Failed to enable AutoCommit: " + ex.getMessage());
-            }
-        }
-
-        // Drop temporary table
-        String dropTempStmt = "DROP TABLE " + tempTableName;
-        try (PreparedStatement dropStatement = connection.prepareStatement(dropTempStmt)) {
-            dropStatement.executeUpdate();
-            DataDebugLog.logDebug("Temporary table dropped: " + tempTableName);
-        } catch (SQLException ex) {
-            DataDebugLog.logDebug("Failed to drop temporary table: " + ex.getMessage());
-        }
-        long loadEnd = System.currentTimeMillis();
-        long loadElapsedTime = loadEnd - loadStart;
-        DataDebugLog.logDebug("Data Conversion Loading time: " + loadElapsedTime + "ms");
-    }
-
-
-    private String buildInsertStatementTemplate(Map<String, SQLColumnType> columnStructure) {
-        StringBuilder sb = new StringBuilder("INSERT INTO ").append(getCredential().getTableName()).append(" (");
-        StringBuilder valuesPlaceholder = new StringBuilder(" VALUES (");
-
-        for (String column : columnStructure.keySet()) {
-            sb.append(column).append(",");
-            valuesPlaceholder.append("?,");
-        }
-
-        // Remove trailing commas
-        sb.setLength(sb.length() - 1);
-        valuesPlaceholder.setLength(valuesPlaceholder.length() - 1);
-
-        sb.append(")").append(valuesPlaceholder).append(")");
-        return sb.toString();
-    }
-*/
-
-/*
-
-    @Override
-    protected void correctColumns(Connection connection, Set<String> removeColumns, Map<String, SQLColumnType> retypeColumns, Map<String, String> moveColumns, Map<String, Map.Entry<String, SQLColumnType>> addColumns) {
-
-        String tempTableName = "FCtempTable";
-        String dropConflict = "DROP TABLE IF EXISTS " + tempTableName + ";";
-
-        try (PreparedStatement preparedStatement = connection.prepareStatement(dropConflict)) {
-            preparedStatement.executeUpdate();
-        } catch (SQLException ex) {
-            DataDebugLog.logDebug("Failed to drop if exists Table. " + ex.getMessage());
-        }
-
-
-        String stmt1 = "ALTER TABLE " + getCredential().getTableName() + " RENAME TO " + tempTableName + ";";
-        DataDebugLog.logDebug(stmt1);
-        try (PreparedStatement preparedStatement = connection.prepareStatement(stmt1)) {
-            preparedStatement.executeUpdate();
-            DataDebugLog.logDebug("Success renaming table.");
-
-        } catch (Exception ex) {
-            DataDebugLog.logDebug("Failed to Alter Table. " + ex.getMessage());
-            return;
-        }
-
-        try {
-            connection.createStatement().executeUpdate(createTableStatement(true));
-        } catch (SQLException e) {
-            DataDebugLog.logDebug("Failed to create new table. " + e.getMessage());
-        }
-
-        try (ResultSet rs = connection.createStatement().executeQuery("SELECT * FROM " + tempTableName)) {
-            connection.setAutoCommit(false); // Start a transaction
-
-            Statement statement = connection.createStatement();
-
-            int count = 0;
-            while (rs.next()) {
-                List<StorageValue> data = new LinkedList<>();
-
-                for (Map.Entry<String, SQLColumnType> entry : getTableStructure().getColumnStructure().entrySet()) {
-                    try {
-                        DatabaseMetaData metaData = connection.getMetaData();
-                        ResultSet colRs = metaData.getColumns(null, null, tempTableName, entry.getKey());
-                        if (colRs.next()) {
-                            data.add(new StorageValue(entry.getKey(), rs.getObject(entry.getKey()), getTableStructure().getColumnStructure().get(entry.getKey())));
-                        }
-                    } catch (Exception ex) {
-                        data.add(new StorageValue(entry.getKey(), getTableStructure().getColumnDefaults().get(entry.getKey()), getTableStructure().getColumnStructure().get(entry.getKey())));
-                    }
-                }
-
-                SerializedData serializedData = new SerializedData();
-                serializedData.fromQuery(data);
-                getSerializer().deserialize(null, serializedData);
-
-                String insertStatement = insertStatement(serializedData.toDatabaseStructure(getTableStructure()));
-                statement.addBatch(insertStatement);
-                count++;
-
-                if (count % getBatchSize() == 0) {
-                    try {
-                        statement.executeBatch();
-                        statement.clearBatch();
-
-                        DataDebugLog.logDebug("Success executing batch of " + count);
-
-                    } catch (SQLException e) {
-                        DataDebugLog.logDebug("Failed executing batch: " + e.getMessage());
-                    }
-                }
-            }
-            DataDebugLog.logDebug("Executing Last batch of " + count);
-
-            statement.executeBatch();
-            connection.commit(); // Commit the transaction
-
-        } catch (SQLException e) {
-            DataDebugLog.logError("Failed column correcting " + getCredential().getTableName() + ": " + e.getMessage());
-            try {
-                connection.rollback();
-            } catch (SQLException ex) {
-                DataDebugLog.logError("Failed to rollback batch insert on column correcting: " + ex.getMessage());
-            }
-        }
-        try {
-            connection.setAutoCommit(true);
-        } catch (SQLException e) {
-            DataDebugLog.logError("Failed to enable AutoCommit: " + e.getMessage());
-        }
-
-        String dropStmt = "DROP TABLE '" + tempTableName + "'";
-        try (PreparedStatement dropStatement = connection.prepareStatement(dropStmt)) {
-            dropStatement.executeUpdate();
-            DataDebugLog.logDebug("Dropping table: " + tempTableName);
-        } catch (Exception ex) {
-            DataDebugLog.logDebug("Failed to Drop temp Table. " + ex.getMessage());
-        }
-    }
-*/
 
     @Override
     public String insertStatement(DatabaseStructure modifiedStructure) {
@@ -476,9 +251,10 @@ public class SQLiteDatabase<T extends StorageModel> extends SQLDatabase<T> {
                 .append(String.join(", ", getTableStructure().getColumnStructure().keySet()))
                 .append(") VALUES (");
         boolean first = true;
-        for (Map.Entry<String, Object> entry : modifiedStructure.getColumnValues().entrySet()) {
-            Object value = StorageUtil.isAtDefaultValue(entry.getValue()) ? getTableStructure().getColumnDefaults().get(entry.getKey()) : entry.getValue();
-            String valueString = modifiedStructure.getColumnStructure().get(entry.getKey()).needsQuotes() ? "'" + value.toString() + "'" : value.toString();
+        for (Map.Entry<String, ColumnData<?>> entry : modifiedStructure.getColumnStructure().entrySet()) {
+            Object value = entry.getValue().getValueOrDefault();
+            SQLColumnData<?> sqlColumnData = (SQLColumnData<?>) entry.getValue();
+            String valueString = sqlColumnData.getColumnType().needsQuotes() ? "'" + value.toString() + "'" : value.toString();
             if (first) {
                 // skip comma
                 builder.append(valueString);
@@ -502,19 +278,24 @@ public class SQLiteDatabase<T extends StorageModel> extends SQLDatabase<T> {
                 .append(" SET ");
 
         boolean first = true;
-        for (Map.Entry<String, Object> entry : modifiedStructure.getColumnValues().entrySet()) {
+        for (Map.Entry<String, ColumnData<?>> entry : modifiedStructure.getColumnStructure().entrySet()) {
+            SQLColumnData<?> sqlColumnData = (SQLColumnData<?>) entry.getValue();
+
             if (first) {
                 // skip key
                 first = false;
                 continue;
             }
-            builder.append(entry.getKey()).append(" = ").append(modifiedStructure.getColumnStructure().get(entry.getKey()).needsQuotes() ? "'" + entry.getValue().toString() + "'" : entry.getValue().toString());
+            builder
+                    .append(entry.getKey())
+                    .append(" = ")
+                    .append(sqlColumnData.getColumnType().needsQuotes() ? "'" + entry.getValue().getValueOrDefault().toString() + "'" : entry.getValue().getValueOrDefault().toString());
             builder.append(", ");
         }
         builder.deleteCharAt(builder.toString().length() - 2);
-        Map.Entry<String, Object> entry = modifiedStructure.getColumnValues().entrySet().iterator().next();
+        Map.Entry<String, ColumnData<?>> entry = modifiedStructure.getColumnStructure().entrySet().iterator().next();
         String key = entry.getKey();
-        Object value = entry.getValue();
+        Object value = entry.getValue().getValueOrDefault();
         builder.append("WHERE ")
                 .append(key)
                 .append(" = '")

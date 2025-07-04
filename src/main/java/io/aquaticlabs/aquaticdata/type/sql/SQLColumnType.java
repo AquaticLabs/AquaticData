@@ -2,21 +2,23 @@ package io.aquaticlabs.aquaticdata.type.sql;
 
 import lombok.Getter;
 
+import java.util.UUID;
+
 @Getter
 public enum SQLColumnType {
-    INT("INT", int.class),
-    INTEGER("INTEGER", int.class),
-    FLOAT("FLOAT", float.class),
-    LONG("BIGINT", long.class),
+    INT("INT", Integer.class),
+    INTEGER("INTEGER", Integer.class),
+    FLOAT("FLOAT", Float.class),
+    LONG("BIGINT", Long.class),
     TEXT("TEXT", String.class),
     VARCHAR("VARCHAR(255)", String.class),
-    VARCHAR_UUID("VARCHAR(36)", String.class),
-    VARCHAR_UUID2("VARCHAR(37)", String.class),
+    VARCHAR_UUID("VARCHAR(36)", UUID.class),
+    VARCHAR_UUID2("VARCHAR(37)", UUID.class),
     VARCHAR_64("VARCHAR(64)", String.class),
-    DOUBLE("DOUBLE", double.class),
-    BOOLEAN("BOOLEAN", boolean.class),
-    TINY_INT("TINYINT", int.class),
-    BIT("BIT", int.class);
+    DOUBLE("DOUBLE", Double.class),
+    BOOLEAN("BOOLEAN", Boolean.class),
+    TINY_INT("TINYINT", Integer.class),
+    BIT("BIT", Integer.class);
 
     private final String sql;
     private final Class<?> associatedClass;

@@ -5,6 +5,7 @@ import io.aquaticlabs.aquaticdata.Database;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.Arrays;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
@@ -23,11 +24,12 @@ public class DataDebugLog {
     @Setter
     private static boolean debug = false;
 
-    private static Logger logger;
-    private static Logger publicLogger;
+    private static final Logger logger;
+    private static final Logger publicLogger;
 
     static {
         logger = Logger.getLogger(DataDebugLog.class.getSimpleName());
+
         ConsoleHandler handler = new ConsoleHandler();
         handler.setFormatter(new SimpleFormatter() {
             @Override
@@ -38,6 +40,7 @@ public class DataDebugLog {
                         record.getMessage());
             }
         });
+        Arrays.stream(logger.getHandlers()).sequential().forEach(logger::removeHandler);
         logger.addHandler(handler);
         logger.setUseParentHandlers(false); // Disable default console logging
 
@@ -52,6 +55,7 @@ public class DataDebugLog {
                         record.getMessage());
             }
         });
+        Arrays.stream(publicLogger.getHandlers()).sequential().forEach(publicLogger::removeHandler);
         publicLogger.addHandler(publicHandler);
         publicLogger.setUseParentHandlers(false); // Disable default console logging
     }

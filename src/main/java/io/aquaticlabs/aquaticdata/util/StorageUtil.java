@@ -120,6 +120,23 @@ public class StorageUtil {
         return (T) parsed;
     }
 
+    public static <V> V getDefaultValueFromClass(Class<V> clazz) {
+        if (clazz.equals(Integer.class)) {
+            return clazz.cast(0);
+        } else if (clazz.equals(Long.class)) {
+            return clazz.cast(0l);
+        } else if (clazz.equals(Double.class)) {
+            return clazz.cast(0.0d);
+        } else if (clazz.equals(Float.class)) {
+            return clazz.cast(0.0f);
+        } else if (clazz.equals(Boolean.class)) {
+            return clazz.cast(true);
+        } else if (clazz.equals(UUID.class)) {
+            return clazz.cast(UUID.fromString("00000000-0000-0000-0000-000000000000"));
+        }
+        return clazz.cast("");
+    }
+
     private static <T> Object doConversion(Object parsed, Class<T> clazz) {
         String value = parsed.toString();
         value = value.replace("\\", "");

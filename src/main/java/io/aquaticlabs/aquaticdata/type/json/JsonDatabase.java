@@ -14,6 +14,7 @@ import io.aquaticlabs.aquaticdata.model.StorageModel;
 import io.aquaticlabs.aquaticdata.queue.ConnectionRequest;
 import io.aquaticlabs.aquaticdata.storage.Storage;
 import io.aquaticlabs.aquaticdata.type.sql.SQLDatabase;
+import io.aquaticlabs.aquaticdata.util.DataDebugLog;
 import io.aquaticlabs.aquaticdata.util.DataEntry;
 import lombok.NonNull;
 
@@ -42,7 +43,7 @@ public class JsonDatabase<T extends StorageModel> extends Database<T> {
     }
 
     private synchronized void initFile() {
-        System.out.println("Init file");
+        DataDebugLog.logDebug("Init file");
         File file = credential.getFile();
         if (!file.exists()) {
             data = new java.util.LinkedHashMap<>();
@@ -58,7 +59,7 @@ public class JsonDatabase<T extends StorageModel> extends Database<T> {
         } catch (IOException e) {
             data = new java.util.LinkedHashMap<>();
         }
-        System.out.println("Data Size: " + data.size() + " data: " + data);
+        DataDebugLog.logDebug("Data Size: " + data.size() + " data: " + data);
     }
 
     private synchronized void saveData() {
@@ -153,6 +154,11 @@ public class JsonDatabase<T extends StorageModel> extends Database<T> {
     }
 
     @Override
+    public <K> CompletableFuture<Map<K, SimpleStorageModel>> getStorageModelMap(List<String> keyColumns, boolean async) {
+        return null;
+    }
+
+    @Override
     public CompletableFuture<List<SimpleStorageModel>> getSortedListByColumn(DatabaseStructure databaseStructure, String sortByColumnName, SQLDatabase.SortOrder sortOrder, int limit, int offset, boolean async) {
         throw new UnsupportedOperationException("Sorting not implemented for JSON database");
     }
@@ -201,7 +207,7 @@ public class JsonDatabase<T extends StorageModel> extends Database<T> {
         CompletableFuture<List<T>> future = new CompletableFuture<>();
         executor.execute(() -> {
             List<T> list = new ArrayList<>();
-            System.out.println(data.values());
+            DataDebugLog.logDebug(data.values());
             for (JsonObject obj : data.values()) {
                 SerializedData sd = new SerializedData();
                 for (Map.Entry<String, JsonElement> e : obj.entrySet()) {

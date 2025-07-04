@@ -6,6 +6,8 @@ import io.aquaticlabs.aquaticdata.DatabaseStructure;
 import io.aquaticlabs.aquaticdata.model.Serializer;
 import io.aquaticlabs.aquaticdata.model.StorageModel;
 import io.aquaticlabs.aquaticdata.queue.ConnectionRequest;
+import io.aquaticlabs.aquaticdata.type.ColumnData;
+import io.aquaticlabs.aquaticdata.type.sql.SQLColumnData;
 import io.aquaticlabs.aquaticdata.type.sql.SQLColumnType;
 import io.aquaticlabs.aquaticdata.type.sql.SQLDatabase;
 import io.aquaticlabs.aquaticdata.util.DataDebugLog;
@@ -30,6 +32,7 @@ public class MariaDBDatabase<T extends StorageModel> extends SQLDatabase<T> {
 
     public MariaDBDatabase(MariaDBCredential credential, DatabaseStructure tableStructure, Serializer<T> serializer, @NonNull Executor asyncExecutor, @NonNull Executor syncExecutor) {
         super(credential, tableStructure, serializer, asyncExecutor, syncExecutor);
+        tableStructure.setTableName(credential.getTableName());
 
         HikariConfig config = new HikariConfig();
         config.setPoolName("Aquatic Labs MariaDB Pool");
@@ -75,21 +78,25 @@ public class MariaDBDatabase<T extends StorageModel> extends SQLDatabase<T> {
 
         boolean first = true;
         String primaryKeyColumn = "";
-        for (Map.Entry<String, SQLColumnType> entry : getTableStructure().getColumnStructure().entrySet()) {
+        for (Map.Entry<String, ColumnData<?>> entry : getTableStructure().getColumnStructure().entrySet()) {
+            String sqlValueKey = entry.getKey();
+            SQLColumnData<?> sqlColumnData = (SQLColumnData<?>) entry.getValue();
+            String sqlValueTypeString = sqlColumnData.getColumnType().getSql();
+
             if (first) {
                 primaryKeyColumn = entry.getKey();
                 builder
                         .append(primaryKeyColumn)
                         .append(" ")
-                        .append(entry.getValue().getSql());
+                        .append(sqlValueTypeString);
                 first = false;
                 continue;
             }
             builder
                     .append(", ")
-                    .append(entry.getKey())
+                    .append(sqlValueKey)
                     .append(" ")
-                    .append(entry.getValue().getSql());
+                    .append(sqlValueTypeString);
         }
         builder.append(", PRIMARY KEY ( ")
                 .append(primaryKeyColumn)
@@ -99,8 +106,9 @@ public class MariaDBDatabase<T extends StorageModel> extends SQLDatabase<T> {
         return builder.toString();
     }
 
+
     @Override
-    protected void correctColumns(Connection connection, Set<String> removeColumns, Map<String, SQLColumnType> retypeColumns, Map<String, String> moveColumns, Map<String, Map.Entry<String, SQLColumnType>> addColumns) {
+    protected void correctColumns(Connection connection, Set<String> removeColumns, Map<String, SQLColumnType> retypeColumns, Map<String, String> moveColumns, Map<String, Map.Entry<String, SQLColumnData<?>>> addColumns) {
         List<String> batches = new ArrayList<>();
 
 
@@ -114,14 +122,16 @@ public class MariaDBDatabase<T extends StorageModel> extends SQLDatabase<T> {
 
         // Next is adds
 
-        for (Map.Entry<String, Map.Entry<String, SQLColumnType>> columnEntry : addColumns.entrySet()) {
-            batches.add(alterStmt + " ADD " + columnEntry.getValue().getKey() + " " + columnEntry.getValue().getValue().getSql() + " NOT NULL AFTER " + columnEntry.getKey() + ";");
+        for (Map.Entry<String, Map.Entry<String, SQLColumnData<?>>> columnEntry : addColumns.entrySet()) {
+            SQLColumnData<?> sqlColumnData = columnEntry.getValue().getValue();
+            batches.add(alterStmt + " ADD " + columnEntry.getValue().getKey() + " " + sqlColumnData.getColumnType().getSql() + " NOT NULL AFTER " + columnEntry.getKey() + ";");
         }
 
         // Now moves
 
         for (Map.Entry<String, String> moveEntry : moveColumns.entrySet()) {
-            batches.add(alterStmt + " CHANGE " + moveEntry.getKey() + " " + moveEntry.getKey() + " " + getTableStructure().getColumnStructure().get(moveEntry.getKey()).getSql() + " NOT NULL AFTER " + moveEntry.getValue() + ";");
+            SQLColumnData<?> sqlColumnData = (SQLColumnData<?>) getTableStructure().getColumnStructure().get(moveEntry.getKey()).getValue();
+            batches.add(alterStmt + " CHANGE " + moveEntry.getKey() + " " + moveEntry.getKey() + " " + sqlColumnData.getColumnType().getSql() + " NOT NULL AFTER " + moveEntry.getValue() + ";");
         }
 
         // Lastly Type Changes
@@ -156,9 +166,10 @@ public class MariaDBDatabase<T extends StorageModel> extends SQLDatabase<T> {
                 .append(String.join(", ", getTableStructure().getColumnStructure().keySet()))
                 .append(") VALUES (");
         boolean first = true;
-        for (Map.Entry<String, Object> entry : modifiedStructure.getColumnValues().entrySet()) {
-            Object value = StorageUtil.isAtDefaultValue(entry.getValue()) ? getTableStructure().getColumnDefaults().get(entry.getKey()) : entry.getValue();
-            String valueString = modifiedStructure.getColumnStructure().get(entry.getKey()).needsQuotes() ? "'" + value.toString() + "'" : value.toString();
+        for (Map.Entry<String, ColumnData<?>> entry : modifiedStructure.getColumnStructure().entrySet()) {
+            Object value = entry.getValue().getValueOrDefault();
+            SQLColumnData<?> sqlColumnData = (SQLColumnData<?>) entry.getValue();
+            String valueString = sqlColumnData.getColumnType().needsQuotes() ? "'" + value.toString() + "'" : value.toString();
             if (first) {
                 // skip comma
                 builder.append(valueString);
@@ -182,19 +193,20 @@ public class MariaDBDatabase<T extends StorageModel> extends SQLDatabase<T> {
                 .append(" SET ");
 
         boolean first = true;
-        for (Map.Entry<String, Object> entry : modifiedStructure.getColumnValues().entrySet()) {
+        for (Map.Entry<String, ColumnData<?>> entry : modifiedStructure.getColumnStructure().entrySet()) {
+            SQLColumnData<?> sqlColumnData = (SQLColumnData<?>) entry.getValue();
             if (first) {
                 // skip key
                 first = false;
                 continue;
             }
-            builder.append(entry.getKey()).append(" = ").append(modifiedStructure.getColumnStructure().get(entry.getKey()).needsQuotes() ? "'" + entry.getValue().toString() + "'" : entry.getValue().toString());
+            builder.append(entry.getKey()).append(" = ").append(sqlColumnData.getColumnType().needsQuotes() ? "'" + entry.getValue().getValueOrDefault().toString() + "'" : entry.getValue().getValueOrDefault().toString());
             builder.append(", ");
         }
         builder.deleteCharAt(builder.toString().length() - 2);
-        Map.Entry<String, Object> entry = modifiedStructure.getColumnValues().entrySet().iterator().next();
+        Map.Entry<String, ColumnData<?>> entry = modifiedStructure.getColumnStructure().entrySet().iterator().next();
         String key = entry.getKey();
-        Object value = entry.getValue();
+        Object value = entry.getValue().getValueOrDefault();
         builder.append("WHERE ")
                 .append(key)
                 .append(" = '")
@@ -206,6 +218,7 @@ public class MariaDBDatabase<T extends StorageModel> extends SQLDatabase<T> {
         return builder.toString();
     }
 
+
     @Override
     public void dropTable() {
         executeRequest(new ConnectionRequest<>(connection -> {
@@ -213,10 +226,9 @@ public class MariaDBDatabase<T extends StorageModel> extends SQLDatabase<T> {
             try (PreparedStatement preparedStatement = connection.prepareStatement(dropConflict)) {
                 preparedStatement.executeUpdate();
             } catch (Exception ex) {
-                DataDebugLog.logDebug("Sqlite Failed to drop if exists Table. " + ex.getMessage());
+                DataDebugLog.logDebug("MariaDB Failed to drop if exists Table. " + ex.getMessage());
             }
             return null;
         }, getSyncExecutor()));
     }
-
 }

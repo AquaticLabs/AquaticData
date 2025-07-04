@@ -7,6 +7,7 @@ import io.aquaticlabs.aquaticdata.queue.ConnectionRequest;
 import io.aquaticlabs.aquaticdata.storage.StorageHolder;
 import io.aquaticlabs.aquaticdata.storage.StorageMode;
 import io.aquaticlabs.aquaticdata.type.DataCredential;
+import io.aquaticlabs.aquaticdata.type.sql.SQLColumnData;
 import io.aquaticlabs.aquaticdata.type.sql.SQLColumnType;
 import io.aquaticlabs.aquaticdata.util.DataEntry;
 
@@ -134,13 +135,13 @@ public class LogDataHolder extends StorageHolder<Integer, LogData> {
     @Override
     public DatabaseStructure getStructure() {
         DatabaseStructure structure = new DatabaseStructure();
-        structure.addColumn("alertID", SQLColumnType.INTEGER);
-        structure.addColumn("timestamp", SQLColumnType.LONG);
-        structure.addColumn("uuid", SQLColumnType.VARCHAR_UUID);
-        structure.addColumn("name", SQLColumnType.VARCHAR);
-        structure.addColumn("checkType", SQLColumnType.VARCHAR);
-        structure.addColumn("moduleName", SQLColumnType.TEXT);
-        structure.addColumn("checkData", SQLColumnType.TEXT);
+        structure.addColumn("alertID", new SQLColumnData<>(0));
+        structure.addColumn("timestamp", new SQLColumnData<>(0L));
+        structure.addColumn("uuid", new SQLColumnData<>(UUID.class));
+        structure.addColumn("name", new SQLColumnData<>(String.class));
+        structure.addColumn("checkType", new SQLColumnData<>(String.class));
+        structure.addColumn("moduleName", new SQLColumnData<>(String.class));
+        structure.addColumn("checkData", new SQLColumnData<>(String.class));
         return structure;
     }
 

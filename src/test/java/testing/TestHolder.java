@@ -8,6 +8,7 @@ import io.aquaticlabs.aquaticdata.queue.ConnectionRequest;
 import io.aquaticlabs.aquaticdata.storage.StorageHolder;
 import io.aquaticlabs.aquaticdata.storage.StorageMode;
 import io.aquaticlabs.aquaticdata.type.DataCredential;
+import io.aquaticlabs.aquaticdata.type.sql.SQLColumnData;
 import io.aquaticlabs.aquaticdata.type.sql.SQLColumnType;
 import io.aquaticlabs.aquaticdata.type.sql.SQLDatabase;
 import io.aquaticlabs.aquaticdata.util.DataEntry;
@@ -116,12 +117,11 @@ public class TestHolder extends StorageHolder<UUID, TestData> {
     @Override
     public DatabaseStructure getStructure() {
         DatabaseStructure structure = new DatabaseStructure();
-        structure.addColumn("uuid", SQLColumnType.VARCHAR_UUID);
-        structure.addColumn("name", SQLColumnType.VARCHAR_64);
-        structure.addColumn("value", SQLColumnType.INTEGER, 0);
-        structure.addColumn("value2", SQLColumnType.INTEGER, 0);
-        structure.addColumn("value_rank", SQLColumnType.INTEGER, 0);
-
+        structure.addColumn("uuid", new SQLColumnData<>(UUID.class));
+        structure.addColumn("name", new SQLColumnData<>(String.class));
+        structure.addColumn("value", new SQLColumnData<>(0));
+        structure.addColumn("value2", new SQLColumnData<>(0));
+        structure.addColumn("value_rank", new SQLColumnData<>(0));
 
         return structure;
     }
@@ -161,7 +161,11 @@ public class TestHolder extends StorageHolder<UUID, TestData> {
         });
     }
 
+    public Map<UUID, SimpleStorageModel> buildSimpleStorageMap(List<String> keyColumns, boolean async) throws ExecutionException, InterruptedException, TimeoutException {
+        return getStorageModelMap(keyColumns, async).get(5, TimeUnit.SECONDS);
+    }
 
+/*
     public CompletableFuture<List<SimpleStorageModel>> getSortedDataList(String sortColumn) {
         DatabaseStructure structure = new DatabaseStructure();
         structure.addColumn("uuid", SQLColumnType.VARCHAR_UUID);
@@ -170,30 +174,31 @@ public class TestHolder extends StorageHolder<UUID, TestData> {
 
         return super.getSortedListByColumn(structure, sortColumn, SQLDatabase.SortOrder.DESC, 50, 0, true);
     }
+*/
 
-/*    public void loadRanks(String statValue) throws ExecutionException, InterruptedException, TimeoutException {
-        CompletableFuture<Boolean> future = new CompletableFuture<>();
-        addExecuteRequest(new ConnectionRequest<>((connection -> {
-            try (PreparedStatement statement = connection.prepareStatement(buildUpdateRankQuery(statValue))) {
-                statement.executeUpdate();
-            } catch (SQLException e) {
-                e.printStackTrace();
-            }
-            future.complete(true);
-            return null;
-        }), CompletableFuture::runAsync));
-        // force thread to wait for outcome.
-        future.get(10, TimeUnit.SECONDS);
-    }
+    /*    public void loadRanks(String statValue) throws ExecutionException, InterruptedException, TimeoutException {
+            CompletableFuture<Boolean> future = new CompletableFuture<>();
+            addExecuteRequest(new ConnectionRequest<>((connection -> {
+                try (PreparedStatement statement = connection.prepareStatement(buildUpdateRankQuery(statValue))) {
+                    statement.executeUpdate();
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+                future.complete(true);
+                return null;
+            }), CompletableFuture::runAsync));
+            // force thread to wait for outcome.
+            future.get(10, TimeUnit.SECONDS);
+        }
 
-    private String buildUpdateRankQuery(String columnName) {
-        String tableName = credential.getTableName();
+        private String buildUpdateRankQuery(String columnName) {
+            String tableName = credential.getTableName();
 
-        return String.format("WITH cte AS (SELECT *, ROW_NUMBER() OVER (ORDER BY %s DESC) rn FROM %s) " +
-                        "UPDATE %s SET %s_rank = (SELECT rn FROM cte c WHERE (c.uuid, c.%s_rank) = (%s.uuid, %s.%s_rank))",
-                columnName, tableName, tableName, columnName, columnName, tableName, tableName, columnName);
-    }
-    */
+            return String.format("WITH cte AS (SELECT *, ROW_NUMBER() OVER (ORDER BY %s DESC) rn FROM %s) " +
+                            "UPDATE %s SET %s_rank = (SELECT rn FROM cte c WHERE (c.uuid, c.%s_rank) = (%s.uuid, %s.%s_rank))",
+                    columnName, tableName, tableName, columnName, columnName, tableName, tableName, columnName);
+        }
+        */
     private static final int BATCH_SIZE = 500;
 
     public void loadRanks(String statValue) throws Exception {
@@ -219,7 +224,7 @@ public class TestHolder extends StorageHolder<UUID, TestData> {
             }), CompletableFuture::runAsync));
 
 
-            if (!future.get(10, TimeUnit.SECONDS)) {
+            if (!future.get(100, TimeUnit.SECONDS)) {
                 break; // Exit loop if no more rows to process
             }
             offset.set(offset.get() + BATCH_SIZE);
@@ -238,6 +243,7 @@ public class TestHolder extends StorageHolder<UUID, TestData> {
                 columnName, tableName, limit, offset, tableName, columnName, tableName
         );
     }
+
     public int getRank(UUID uuid) throws ExecutionException, InterruptedException, TimeoutException {
         CompletableFuture<Integer> future = new CompletableFuture<>();
         executeRequest(new ConnectionRequest<>((connection -> {
@@ -253,7 +259,6 @@ public class TestHolder extends StorageHolder<UUID, TestData> {
         }), Runnable::run));
         return future.get(10, TimeUnit.SECONDS);
     }
-
 
 
     public void saveAll(boolean async) throws ExecutionException, InterruptedException, TimeoutException {

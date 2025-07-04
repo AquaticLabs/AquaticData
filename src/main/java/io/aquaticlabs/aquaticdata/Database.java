@@ -8,6 +8,8 @@ import io.aquaticlabs.aquaticdata.model.StorageModel;
 import io.aquaticlabs.aquaticdata.queue.ConnectionQueue;
 import io.aquaticlabs.aquaticdata.queue.ConnectionRequest;
 import io.aquaticlabs.aquaticdata.storage.Storage;
+import io.aquaticlabs.aquaticdata.type.ColumnData;
+import io.aquaticlabs.aquaticdata.type.sql.SQLColumnData;
 import io.aquaticlabs.aquaticdata.type.sql.SQLDatabase;
 import io.aquaticlabs.aquaticdata.util.DataEntry;
 import lombok.AccessLevel;
@@ -69,9 +71,9 @@ public abstract class Database<T extends StorageModel> {
     protected void loadIntoCache(T object, SerializedData data) {
         ModelCachedData cache = getDataCache().computeIfAbsent(object.getKey().toString(), key -> new ModelCachedData());
 
-        for (Map.Entry<String, Object> entryList : data.toDatabaseStructure(getTableStructure()).getColumnValues().entrySet()) {
+        for (Map.Entry<String, ColumnData<?>> entryList : data.toDatabaseStructure(getTableStructure()).getColumnStructure().entrySet()) {
             String column = entryList.getKey();
-            String value = entryList.getValue().toString();
+            String value = entryList.getValue().getValueOrDefault().toString();
             cache.add(column, value);
         }
     }
@@ -116,6 +118,8 @@ public abstract class Database<T extends StorageModel> {
     public abstract CompletableFuture<List<T>> saveList(List<T> list, boolean async);
 
     public abstract CompletableFuture<List<T>> getKeyedList(String key, String keyValue, boolean async);
+
+    public abstract <K> CompletableFuture<Map<K, SimpleStorageModel>> getStorageModelMap(List<String> keyColumns, boolean async);
 
     public abstract CompletableFuture<List<SimpleStorageModel>> getSortedListByColumn(DatabaseStructure databaseStructure, String sortByColumnName, SQLDatabase.SortOrder sortOrder, int limit, int offset, boolean async);
 

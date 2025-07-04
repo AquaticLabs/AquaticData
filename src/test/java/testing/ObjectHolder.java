@@ -6,6 +6,7 @@ import io.aquaticlabs.aquaticdata.model.Serializer;
 import io.aquaticlabs.aquaticdata.storage.StorageHolder;
 import io.aquaticlabs.aquaticdata.storage.StorageMode;
 import io.aquaticlabs.aquaticdata.type.DataCredential;
+import io.aquaticlabs.aquaticdata.type.sql.SQLColumnData;
 import io.aquaticlabs.aquaticdata.type.sql.SQLColumnType;
 
 import java.util.Iterator;
@@ -30,9 +31,9 @@ public class ObjectHolder extends StorageHolder<UUID, SavableObject> {
     @Override
     public DatabaseStructure getStructure() {
         return new DatabaseStructure()
-                .addColumn("uuid", SQLColumnType.VARCHAR_UUID)
-                .addColumn("value", SQLColumnType.INT, 0)
-                .addColumn("isEnabled", SQLColumnType.BOOLEAN, true);
+                .addColumn("uuid", new SQLColumnData<>(UUID.class))
+                .addColumn("value", new SQLColumnData<>(0))
+                .addColumn("isEnabled", new SQLColumnData<>(true));
     }
 
     @Override

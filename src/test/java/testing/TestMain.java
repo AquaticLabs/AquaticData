@@ -2,10 +2,11 @@ package testing;
 
 
 import io.aquaticlabs.aquaticdata.model.SimpleStorageModel;
+import io.aquaticlabs.aquaticdata.tasks.AquaticRunnable;
 import io.aquaticlabs.aquaticdata.tasks.TaskFactory;
-import io.aquaticlabs.aquaticdata.type.json.JsonCredential;
 import io.aquaticlabs.aquaticdata.type.sql.sqlite.SQLiteCredential;
 import io.aquaticlabs.aquaticdata.util.DataDebugLog;
+import io.aquaticlabs.aquaticdata.util.DataEntry;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,7 +14,10 @@ import org.junit.jupiter.api.Test;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
@@ -34,7 +38,8 @@ class TestMain {
     void setup() {
         DataDebugLog.setDebug(true);
 
-        holder = new TestHolder(new JsonCredential("TestingSB", "TestingTable", new File( "data.json")));
+        // holder = new TestHolder(new JsonCredential("TestingSB", "TestingTable", new File( "data.json")));
+        holder = new TestHolder(new SQLiteCredential("TestingSB", "TestingTable", new File("")));
     }
 
     @AfterEach
@@ -52,7 +57,7 @@ class TestMain {
         Assertions.assertNotNull(holder.loadIntoCache(UUID.fromString("f911d440-583e-4131-91ad-3e8b62dda1a1")));
     }
 
-    @Test
+    //@Test
     void addEntry() {
         TestData data = new TestData(UUID.randomUUID());
         data.setName("Jeff");
@@ -79,27 +84,45 @@ class TestMain {
 
     }
 
-    // @Test
+    @Test
     void testRank() throws Exception {
         System.out.println("1");
 
-        holder.loadRanks("value");
+        List<String> keyCols = new ArrayList<>();
+        keyCols.add("uuid");
+        keyCols.add("name");
+        keyCols.add("value");
+        Map<UUID, SimpleStorageModel> modelMap = holder.getStorageModelMap(keyCols, false).get(10, TimeUnit.SECONDS);
+        Map<UUID, DataEntry<SimpleStorageModel, Object>> sortedMap = new LinkedHashMap<>();
+        System.out.println(modelMap.size());
+        System.out.println(holder.getDataMap().size());
+
+        Assertions.assertFalse(modelMap.isEmpty());
+        int i = 0;
+        for (Map.Entry<UUID, SimpleStorageModel> entry : modelMap.entrySet()) {
+            sortedMap.put(entry.getKey(), new DataEntry<>(entry.getValue(), entry.getValue().getValue("value")));
+            if (i <= 10) {
+                System.out.println("model name: " + entry.getValue().getValue("name") + " val: " + entry.getValue().getValue("value"));
+            }
+            i++;
+        }
+        sortedMap = ObjectSorter.sortIntAndName(sortedMap);
+
+        i = 1;
+        for (Map.Entry<UUID, DataEntry<SimpleStorageModel, Object>> entry : sortedMap.entrySet()) {
+            System.out.println("top i " + i + " name: " + entry.getValue().getKey().getValue("name") + " val: " + entry.getValue().getValue());
+            if (i >= 11) {
+                break;
+            }
+            i++;
+        }
+
         System.out.println("ranks");
     }
 
 
-    void testGetSortedList() throws ExecutionException, InterruptedException, TimeoutException {
-
 /*
-        for (int i = 0; i < 100000; i++) {
-            TestData data = new TestData(UUID.randomUUID());
-            data.setName("Tony: " + i);
-            data.setValue(randomNumber(1, 1341231));
-            holder.add(data);
-        }
-        holder.saveAll(false);
-
-*/
+    void testGetSortedList() throws ExecutionException, InterruptedException, TimeoutException {
 
         try {
             List<SimpleStorageModel> sortedList = holder.getSortedDataList("value").get(1, TimeUnit.MINUTES);
@@ -120,6 +143,7 @@ class TestMain {
             e.printStackTrace();
         }
     }
+*/
 
 
     public static Integer randomNumber(int min, int max) {
@@ -130,9 +154,10 @@ class TestMain {
             return min + i.nextInt(max - min);
         }
     }
+
     @Test
     void dataExists() {
-        TestData data = holder.get(UUID.fromString("3a566fd7-8c08-44f9-80a8-983df9a54ff2"));
+        TestData data = holder.get(UUID.fromString("838267c7-f097-4a2b-8289-94ec49b250ee"));
         System.out.println(holder.getDataMap().size());
 
         if (data != null) {
@@ -166,7 +191,6 @@ class TestMain {
         AtomicInteger secs = new AtomicInteger();
 
         TaskFactory factory = TaskFactory.getOrNew("Testing Factory");
-/*
 
         factory.createRepeatingTask(new AquaticRunnable() {
             @Override
@@ -177,7 +201,6 @@ class TestMain {
 
         while (secs.get() < 6) {
         }
-*/
 
         System.out.println("timoutTime: " + holder.getTimeOutTime());
 

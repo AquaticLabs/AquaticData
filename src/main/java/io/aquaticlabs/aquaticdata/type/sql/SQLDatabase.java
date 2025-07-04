@@ -1,6 +1,5 @@
 package io.aquaticlabs.aquaticdata.type.sql;
 
-import com.google.common.annotations.VisibleForTesting;
 import io.aquaticlabs.aquaticdata.DatabaseStructure;
 import io.aquaticlabs.aquaticdata.cache.ModelCachedData;
 import io.aquaticlabs.aquaticdata.model.SerializedData;
@@ -10,6 +9,8 @@ import io.aquaticlabs.aquaticdata.model.StorageModel;
 import io.aquaticlabs.aquaticdata.model.StorageValue;
 import io.aquaticlabs.aquaticdata.queue.ConnectionRequest;
 import io.aquaticlabs.aquaticdata.storage.Storage;
+import io.aquaticlabs.aquaticdata.type.ColumnData;
+import io.aquaticlabs.aquaticdata.type.sql.sqlite.SQLiteCredential;
 import io.aquaticlabs.aquaticdata.util.DataDebugLog;
 import io.aquaticlabs.aquaticdata.util.DataEntry;
 import io.aquaticlabs.aquaticdata.util.StorageUtil;
@@ -26,6 +27,7 @@ import java.sql.Statement;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import java.util.stream.Collectors;
 
 /**
  * @Author: extremesnow
@@ -39,9 +41,16 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
     @Setter
     private int batchSize = 500; // Adjust the batch size as needed
 
+    private boolean sqliteCredential = false;
+
     protected SQLDatabase(SQLCredential credential, DatabaseStructure tableStructure, Serializer<T> serializer, @NonNull Executor asyncExecutor, @NonNull Executor syncExecutor) {
         super(tableStructure, serializer, asyncExecutor, syncExecutor);
         this.credential = credential;
+        tableStructure.setTableName(credential.getTableName());
+        if (credential instanceof SQLiteCredential) {
+            sqliteCredential = true;
+        }
+
     }
 
 
@@ -51,7 +60,7 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
 
     public <K> void start(Storage<K, T> holder, boolean async) {
         confirmTable(getTableStructure());
-        // load a cache ?
+        // load a cache ? // todo?
     }
 
     protected boolean doesEntryExist(Connection connection, DataEntry<String, ?> key) {
@@ -82,7 +91,7 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
             Set<String> removeColumns = new HashSet<>();
             Map<String, SQLColumnType> retypeColumns = new LinkedHashMap<>();
             Map<String, String> moveColumns = new LinkedHashMap<>();
-            Map<String, Map.Entry<String, SQLColumnType>> addColumns = new LinkedHashMap<>();
+            Map<String, Map.Entry<String, SQLColumnData<?>>> addColumns = new LinkedHashMap<>();
 
             // is table good?
             if (!verifyColumns(connection, removeColumns, retypeColumns, moveColumns, addColumns)) {
@@ -113,7 +122,6 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
      * @param useRunner Whether to use a dedicated executor for the operation.
      * @param <S>       The iterable type that extends {@link Iterable} containing objects of type {@code T}.
      * @return A {@link CompletableFuture} containing the list of successfully saved objects.
-     *
      * @throws SQLException If an error occurs during batch execution or database operations.
      */
     @Override
@@ -141,7 +149,7 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
                         DatabaseStructure needsUpdate = buildNeedsUpdate(object, data);
 
                         // If the size is 1, it should only contain the key.
-                        if (needsUpdate.getColumnValues().size() == 1) {
+                        if (needsUpdate.getColumnStructure().size() == 1) {
                             DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Needs update contains no data values. no need for updating");
                             continue;
                         }
@@ -208,7 +216,6 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
      * @param list  The list of objects to be saved or updated.
      * @param async Whether to execute the operation asynchronously.
      * @return A {@link CompletableFuture} containing the list of successfully saved objects.
-     *
      * @throws SQLException If an error occurs during batch execution or database operations.
      */
     @Override
@@ -232,7 +239,7 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
                         DatabaseStructure needsUpdate = buildNeedsUpdate(object, data);
 
                         // If the size is 1, it should only contain the key.
-                        if (needsUpdate.getColumnValues().size() == 1) {
+                        if (needsUpdate.getColumnStructure().size() == 1) {
                             DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Needs update contains no data values. no need for updating");
                             continue;
                         }
@@ -296,7 +303,6 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
      * @param object The object of type {@code T} to be saved or updated.
      * @param async  Whether to execute the operation asynchronously.
      * @return A {@link CompletableFuture} containing the saved object.
-     *
      * @throws SQLException If an error occurs while executing the SQL insert or update statement.
      */
     @Override
@@ -309,7 +315,7 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
 
         DatabaseStructure needsUpdate = buildNeedsUpdate(object, data);
         // If the size is 1, it should only contain the key.
-        if (needsUpdate.getColumnValues().size() == 1) {
+        if (needsUpdate.getColumnStructure().size() == 1) {
             DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Needs update contains no data values. no need for updating");
             return null;
         }
@@ -356,7 +362,6 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
      * @param persist Whether to persist the loaded entry in storage.
      * @param <K>     The key type of the storage holder.
      * @return A {@link CompletableFuture} containing the deserialized object of type {@code T}, or {@code null} if not found.
-     *
      * @throws SQLException If an error occurs while executing the SQL query.
      * @throws Exception    If deserialization of the query result fails.
      */
@@ -377,7 +382,7 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
             try (ResultSet rs = connection.createStatement().executeQuery(sql)) {
                 int column = 1;
                 List<StorageValue> data = new LinkedList<>();
-                for (Map.Entry<String, SQLColumnType> entry : getTableStructure().getColumnStructure().entrySet()) {
+                for (Map.Entry<String, ColumnData<?>> entry : getTableStructure().getColumnStructure().entrySet()) {
                     data.add(new StorageValue(entry.getKey(), rs.getObject(column), SQLColumnType.matchType(rs.getMetaData().getColumnTypeName(column))));
                     column++;
                 }
@@ -406,7 +411,6 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
      * @param async  Whether to execute the query asynchronously.
      * @param <K>    The key type of the storage holder.
      * @return A {@link CompletableFuture} containing a list of deserialized objects of type {@code T}.
-     *
      * @throws SQLException If an error occurs while executing the SQL query.
      * @throws Exception    If deserialization of query results fails.
      */
@@ -417,15 +421,19 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
         executeRequest(new ConnectionRequest<>(conn -> {
             List<T> loaded = new ArrayList<>();
             try (Statement stmt = conn.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY)) {
-                stmt.setFetchSize(Integer.MIN_VALUE); // Stream results one by one for MySQL/MariaDB
+
+                if (!sqliteCredential) {
+                    stmt.setFetchSize(Integer.MIN_VALUE); // Stream results one by one for MySQL/MariaDB
+                }
                 ResultSet rs = stmt.executeQuery("SELECT * FROM " + credential.getTableName());
 
                 // Prepare static column type mappings to avoid repeated calls to ResultSet metadata
                 List<String> columnNames = new ArrayList<>();
                 List<SQLColumnType> columnTypes = new ArrayList<>();
-                for (Map.Entry<String, SQLColumnType> entry : getTableStructure().getColumnStructure().entrySet()) {
+                for (Map.Entry<String, ColumnData<?>> entry : getTableStructure().getColumnStructure().entrySet()) {
+                    SQLColumnData<?> columnData = (SQLColumnData<?>) entry.getValue();
                     columnNames.add(entry.getKey());
-                    columnTypes.add(SQLColumnType.matchType(entry.getValue().getSql()));
+                    columnTypes.add(columnData.getColumnType());
                 }
 
                 // Collect ResultSet rows in a batch list for parallel processing
@@ -463,7 +471,6 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
     }
 
 
-
     /**
      * Retrieves a list of objects from the database based on a specific key column and value.
      * This method queries the database for rows where the specified key column matches the given key value,
@@ -473,7 +480,6 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
      * @param keyValue  The value to match in the specified key column.
      * @param async     Whether to execute the query asynchronously.
      * @return A {@link CompletableFuture} containing a list of deserialized objects of type {@code T}.
-     *
      * @throws SQLException If an error occurs while executing the SQL query.
      * @throws Exception    If deserialization of query results fails.
      */
@@ -488,9 +494,10 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
 
                 List<String> columnNames = new ArrayList<>();
                 List<SQLColumnType> columnTypes = new ArrayList<>();
-                for (Map.Entry<String, SQLColumnType> entry : getTableStructure().getColumnStructure().entrySet()) {
+                for (Map.Entry<String, ColumnData<?>> entry : getTableStructure().getColumnStructure().entrySet()) {
+                    SQLColumnData<?> columnData = (SQLColumnData<?>) entry.getValue();
                     columnNames.add(entry.getKey());
-                    columnTypes.add(SQLColumnType.matchType(entry.getValue().getSql()));
+                    columnTypes.add(columnData.getColumnType());
                 }
 
                 List<List<StorageValue>> rowData = new ArrayList<>();
@@ -524,6 +531,38 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
     }
 
 
+    @Override
+    public <K> CompletableFuture<Map<K, SimpleStorageModel>> getStorageModelMap(List<String> keyColumns, boolean async) {
+        Executor executor = getExecutor(async);
+        CompletableFuture<Map<K, SimpleStorageModel>> future = new CompletableFuture<>();
+        executeRequest(new ConnectionRequest<>(conn -> {
+            Map<K, SimpleStorageModel> modelMap = new LinkedHashMap<>();
+            try (Statement stmt = conn.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY)) {
+
+                String query = "SELECT " + String.join(", ", keyColumns) + " FROM " + credential.getTableName() + ";";
+                DataDebugLog.logDebug(query);
+                ResultSet rs = stmt.executeQuery(query);
+
+
+                SimpleStorageModel model = new SimpleStorageModel(getTableStructure().getKeyName());
+                for (String colKey : keyColumns) {
+                    try {
+                        Object colVal = rs.getObject(colKey);
+                        model.addValue(colKey, colVal);
+                    } catch (Exception e) {
+                        DataDebugLog.logError("Failed to build simple storage model: " + e.getMessage());
+                    }
+                }
+            } catch (SQLException e) {
+                DataDebugLog.logError("Failed to build Model Map of users: " + e.getMessage());
+            }
+            future.complete(modelMap);
+            return null;
+        }, executor));
+        return future;
+    }
+
+
     /**
      * Retrieves a sorted list of {@link SimpleStorageModel} objects from the database based on a specified column.
      * This method constructs a SQL query to fetch and sort records according to the given column, order, limit, and offset.
@@ -535,7 +574,6 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
      * @param offset            The number of records to skip before retrieving results.
      * @param async             Whether to execute the query asynchronously.
      * @return A {@link CompletableFuture} containing a list of sorted {@link SimpleStorageModel} objects.
-     *
      * @throws Exception If an error occurs while executing the SQL query or processing the results.
      */
     @Override
@@ -584,7 +622,7 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
     private SimpleStorageModel buildSimpleStorageModel(ResultSet rs, DatabaseStructure databaseStructure) throws SQLException {
         SimpleStorageModel model = new SimpleStorageModel(rs.getString(databaseStructure.getKeyName()));
         try {
-            for (Map.Entry<String, SQLColumnType> entry : databaseStructure.getColumnStructure().entrySet()) {
+            for (Map.Entry<String, ColumnData<?>> entry : databaseStructure.getColumnStructure().entrySet()) {
                 String colName = entry.getKey();
                 Object colVal = rs.getObject(colName);
                 model.addValue(colName, colVal);
@@ -604,25 +642,28 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
         ModelCachedData cachedData = getDataCache().computeIfAbsent(object.getKey().toString(), key -> new ModelCachedData());
 
         // Check the cache to see if there's outdated data.
-        DatabaseStructure needsUpdate = new DatabaseStructure(credential.getTableName());
+        DatabaseStructure needsUpdate = new DatabaseStructure();
+        needsUpdate.setTableName(credential.getTableName());
         boolean first = true;
-        for (Map.Entry<String, Object> entry : data.toDatabaseStructure(getTableStructure()).getColumnValues().entrySet()) {
+        for (Map.Entry<String, ColumnData<?>> entry : data.toDatabaseStructure(getTableStructure()).getColumnStructure().entrySet()) {
             String column = entry.getKey();
-            String value = entry.getValue() == null ? getTableStructure().getColumnDefaults().get(column).toString() : entry.getValue().toString();
+            SQLColumnData<?> columnData = (SQLColumnData<?>) entry.getValue();
+            // String value = entry.getValue().getValue() == null ? entry.getValue().getDefaultValue().toString() : entry.getValue().getValue().toString();
+
             if (first) {
-                needsUpdate.addValue(column, getTableStructure().getColumnStructure().get(column), value);
+                needsUpdate.addValue(column, columnData);
                 first = false;
                 continue;
             }
-            if (!data.getValue(entry.getKey()).isPresent() || cachedData.isOutdated(column, value)) {
-                needsUpdate.addValue(column, getTableStructure().getColumnStructure().get(column), value);
-                DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Needs Update: " + column + " " + value);
+            if (!data.getValue(entry.getKey()).isPresent() || cachedData.isOutdated(column, columnData.getValueOrDefault().toString())) {
+                needsUpdate.addValue(column, columnData);
+                DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Needs Update: " + column + " " + columnData.getValueOrDefault());
             }
         }
         return needsUpdate;
     }
 
-    protected boolean verifyColumns(Connection connection, Set<String> removeColumns, Map<String, SQLColumnType> retypeColumns, Map<String, String> moveColumns, Map<String, Map.Entry<String, SQLColumnType>> addColumns) {
+    protected boolean verifyColumns(Connection connection, Set<String> removeColumns, Map<String, SQLColumnType> retypeColumns, Map<String, String> moveColumns, Map<String, Map.Entry<String, SQLColumnData<?>>> addColumns) {
         boolean needsAltering = false;
         try {
 
@@ -647,9 +688,11 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
 
 
             int addCurrent = 0;
-            for (Map.Entry<String, SQLColumnType> entry : getTableStructure().getColumnStructure().entrySet()) {
+            for (Map.Entry<String, ColumnData<?>> entry : getTableStructure().getColumnStructure().entrySet()) {
                 if (!databaseColumns.containsKey(entry.getKey())) {
-                    addColumns.put(structureColumns.get(addCurrent - 1), entry);
+                    SQLColumnData<?> columnData = (SQLColumnData<?>) entry.getValue();
+                    Map.Entry<String, SQLColumnData<?>> castedEntry = new AbstractMap.SimpleEntry<>(entry.getKey(), columnData);
+                    addColumns.put(structureColumns.get(addCurrent - 1), castedEntry);
                     needsAltering = true;
                 }
                 addCurrent++;
@@ -674,7 +717,9 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
                 if (!getTableStructure().getColumnStructure().containsKey(dataEntry.getKey())) {
                     continue;
                 }
-                SQLColumnType structureColumnType = getTableStructure().getColumnStructure().get(dataEntry.getKey());
+
+                SQLColumnData<?> columnData = (SQLColumnData<?>) getTableStructure().getColumnStructure().get(dataEntry.getKey());
+                SQLColumnType structureColumnType = columnData.getColumnType();
 
                 String databaseColumnName = dataEntry.getKey();
                 String databaseColumnTypeName = dataEntry.getValue();
@@ -696,10 +741,10 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
         return needsAltering;
     }
 
-    private static List<String> getDataMirrorArray(Map<String, Map.Entry<String, SQLColumnType>> addColumns, Map<String, DataEntry<String, String>> dataClone, List<String> structureColumns) {
+    private static List<String> getDataMirrorArray(Map<String, Map.Entry<String, SQLColumnData<?>>> addColumns, Map<String, DataEntry<String, String>> dataClone, List<String> structureColumns) {
         List<String> dataMirrorArray = new ArrayList<>(dataClone.keySet());
 
-        for (Map.Entry<String, Map.Entry<String, SQLColumnType>> colEntry : addColumns.entrySet()) {
+        for (Map.Entry<String, Map.Entry<String, SQLColumnData<?>>> colEntry : addColumns.entrySet()) {
             String colName = colEntry.getValue().getKey();
             int addAtInt = 0;
             for (String col : structureColumns) {
@@ -746,7 +791,7 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
 
     public abstract String createTableStatement(boolean force);
 
-    protected abstract void correctColumns(Connection connection, Set<String> removeColumns, Map<String, SQLColumnType> retypeColumns, Map<String, String> moveColumns, Map<String, Map.Entry<String, SQLColumnType>> addColumns);
+    protected abstract void correctColumns(Connection connection, Set<String> removeColumns, Map<String, SQLColumnType> retypeColumns, Map<String, String> moveColumns, Map<String, Map.Entry<String, SQLColumnData<?>>> addColumns);
 
     public abstract String insertStatement(DatabaseStructure modifiedStructure);
 

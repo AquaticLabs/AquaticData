@@ -5,6 +5,7 @@ import io.aquaticlabs.aquaticdata.DatabaseStructure;
 import io.aquaticlabs.aquaticdata.model.Serializer;
 import io.aquaticlabs.aquaticdata.model.StorageModel;
 import io.aquaticlabs.aquaticdata.type.DataCredential;
+import lombok.NonNull;
 
 import java.io.File;
 import java.util.concurrent.Executor;
@@ -36,7 +37,7 @@ public class JsonCredential  implements DataCredential {
     }
 
     @Override
-    public <T extends StorageModel> Database<T> build(DatabaseStructure tableStructure, Serializer<T> serializer, Executor asyncExecutor, Executor syncExecutor) {
+    public <T extends StorageModel> Database<T> build(DatabaseStructure tableStructure, Serializer<T> serializer, @NonNull Executor asyncExecutor, @NonNull Executor syncExecutor) {
         return new JsonDatabase<>(this, tableStructure, serializer, asyncExecutor, syncExecutor);
     }
 

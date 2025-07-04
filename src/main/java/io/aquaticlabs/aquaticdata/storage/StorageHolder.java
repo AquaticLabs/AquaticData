@@ -25,6 +25,7 @@ import io.aquaticlabs.aquaticdata.util.DataEntry;
 import lombok.NonNull;
 
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
@@ -142,6 +143,10 @@ public abstract class StorageHolder<K, T extends StorageModel> extends Storage<K
 
     protected CompletableFuture<List<SimpleStorageModel>> getSortedListByColumn(DatabaseStructure databaseStructure, String sortByColumnName, SQLDatabase.SortOrder sortOrder, int limit, int offset, boolean async) {
         return database.getSortedListByColumn(databaseStructure, sortByColumnName, sortOrder, limit, offset, async);
+    }
+
+    public CompletableFuture<Map<K, SimpleStorageModel>> getStorageModelMap(List<String> keyColumns, boolean async) {
+        return database.getStorageModelMap(keyColumns, async);
     }
 
     protected void executeRequest(ConnectionRequest<?> connectionRequest) {
