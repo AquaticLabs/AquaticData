@@ -19,6 +19,15 @@ public class SQLColumnData<V> extends ColumnData<V> {
         super(StorageUtil.getDefaultValueFromClass(valueClass));
         this.columnType = SQLColumnType.matchColumnClassType(valueClass);
     }
+    public SQLColumnData(Class<V> valueClass, boolean compareCache) {
+        super(StorageUtil.getDefaultValueFromClass(valueClass), compareCache);
+        this.columnType = SQLColumnType.matchColumnClassType(valueClass);
+    }
+
+    public SQLColumnData<V> compareCache(boolean compareCache) {
+        this.compareCache = compareCache;
+        return this;
+    }
 
     @SneakyThrows
     public SQLColumnData(V defaultValue) {

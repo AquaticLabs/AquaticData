@@ -15,6 +15,7 @@ import io.aquaticlabs.aquaticdata.queue.ConnectionRequest;
 import io.aquaticlabs.aquaticdata.storage.Storage;
 import io.aquaticlabs.aquaticdata.type.sql.SQLDatabase;
 import io.aquaticlabs.aquaticdata.util.DataDebugLog;
+import io.aquaticlabs.aquaticdata.util.DataDebugLogType;
 import io.aquaticlabs.aquaticdata.util.DataEntry;
 import lombok.NonNull;
 
@@ -43,7 +44,7 @@ public class JsonDatabase<T extends StorageModel> extends Database<T> {
     }
 
     private synchronized void initFile() {
-        DataDebugLog.logDebug("Init file");
+        DataDebugLog.logDebug(DataDebugLogType.OTHER, "Init file");
         File file = credential.getFile();
         if (!file.exists()) {
             data = new java.util.LinkedHashMap<>();
@@ -59,7 +60,7 @@ public class JsonDatabase<T extends StorageModel> extends Database<T> {
         } catch (IOException e) {
             data = new java.util.LinkedHashMap<>();
         }
-        DataDebugLog.logDebug("Data Size: " + data.size() + " data: " + data);
+        DataDebugLog.logDebug(DataDebugLogType.OTHER, "Data Size: " + data.size() + " data: " + data);
     }
 
     private synchronized void saveData() {
@@ -207,7 +208,7 @@ public class JsonDatabase<T extends StorageModel> extends Database<T> {
         CompletableFuture<List<T>> future = new CompletableFuture<>();
         executor.execute(() -> {
             List<T> list = new ArrayList<>();
-            DataDebugLog.logDebug(data.values());
+            DataDebugLog.logDebug(DataDebugLogType.OTHER, data.values());
             for (JsonObject obj : data.values()) {
                 SerializedData sd = new SerializedData();
                 for (Map.Entry<String, JsonElement> e : obj.entrySet()) {

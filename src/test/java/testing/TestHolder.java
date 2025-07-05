@@ -121,7 +121,7 @@ public class TestHolder extends StorageHolder<UUID, TestData> {
         structure.addColumn("name", new SQLColumnData<>(String.class));
         structure.addColumn("value", new SQLColumnData<>(0));
         structure.addColumn("value2", new SQLColumnData<>(0));
-        structure.addColumn("value_rank", new SQLColumnData<>(0));
+        structure.addColumn("value_rank", new SQLColumnData<>(0).compareCache(false));
 
         return structure;
     }

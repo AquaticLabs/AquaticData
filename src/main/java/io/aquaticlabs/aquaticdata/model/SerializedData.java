@@ -66,8 +66,9 @@ public class SerializedData {
         DatabaseStructure structure = new DatabaseStructure();
         structure.setTableName(tableStructure.getTableName());
         for (Map.Entry<String, ColumnData<?>> entry : tableStructure.getColumnStructure().entrySet()) {
-            String value = applyAs(entry.getKey(), String.class) + "";
-            structure.addValue(entry.getKey(), new SQLColumnData<>(value));
+            String key = entry.getKey();
+            String value = applyAs(key, String.class, () -> entry.getValue().getDefaultValue() + "");
+            structure.addValue(entry.getKey(), new SQLColumnData<>(value).compareCache(entry.getValue().isCompareCache()));
         }
         return structure;
     }

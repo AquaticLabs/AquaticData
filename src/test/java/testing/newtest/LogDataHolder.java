@@ -8,15 +8,10 @@ import io.aquaticlabs.aquaticdata.storage.StorageHolder;
 import io.aquaticlabs.aquaticdata.storage.StorageMode;
 import io.aquaticlabs.aquaticdata.type.DataCredential;
 import io.aquaticlabs.aquaticdata.type.sql.SQLColumnData;
-import io.aquaticlabs.aquaticdata.type.sql.SQLColumnType;
 import io.aquaticlabs.aquaticdata.util.DataEntry;
 
-import java.sql.ResultSet;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 /**
  * @Author: extremesnow
@@ -25,9 +20,6 @@ import java.util.concurrent.TimeoutException;
  */
 public class LogDataHolder extends StorageHolder<Integer, LogData> {
 
-    //private final Map<UUID, List<LogData>> data = new ConcurrentHashMap<>();
-    //private final Map<Integer, LogData> data = new ConcurrentHashMap<>();
-    //private final Map<UUID, List<LogData>> userMap = new ConcurrentHashMap<>();
 
 
     public LogDataHolder(DataCredential credential) {

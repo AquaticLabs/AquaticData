@@ -7,6 +7,7 @@ import io.aquaticlabs.aquaticdata.model.Serializer;
 import io.aquaticlabs.aquaticdata.model.StorageModel;
 import io.aquaticlabs.aquaticdata.queue.ConnectionRequest;
 import io.aquaticlabs.aquaticdata.util.DataDebugLog;
+import io.aquaticlabs.aquaticdata.util.DataDebugLogType;
 import lombok.AccessLevel;
 import lombok.NonNull;
 import lombok.Setter;
@@ -34,15 +35,15 @@ public abstract class HikariCPDatabase<T extends StorageModel> extends Database<
         // Try with resources auto closes the connection.
         try (Connection connection = hikariDataSource.getConnection()) {
             if (connectionRequest.getExecutor() == null) {
-                DataDebugLog.logDebug("executeRequest: runner is null");
+                DataDebugLog.logDebug(DataDebugLogType.TASK_QUEUE, "executeRequest: runner is null");
             }
             return connectionRequest.getRequest().doInConnection(connection);
         } catch (SQLException e) {
             throw new IllegalStateException("Error during SQL execution.", e);
         } finally {
-            DataDebugLog.logDebug("Closed Connection. Runnables: " + connectionRequest.getWhenCompleteRunnables().size());
+            DataDebugLog.logDebug(DataDebugLogType.TASK_CLOSED_CONNECTION, "Closed Connection. Runnables: " + connectionRequest.getWhenCompleteRunnables().size());
             for (Runnable runnable : connectionRequest.getWhenCompleteRunnables()) {
-                DataDebugLog.logDebug("Running WhenCompleteRunnable");
+                DataDebugLog.logDebug(DataDebugLogType.TASK_QUEUE, "Running WhenCompleteRunnable");
                 if (connectionRequest.getExecutor() != null) {
                     connectionRequest.getExecutor().execute(runnable);
                 } else {

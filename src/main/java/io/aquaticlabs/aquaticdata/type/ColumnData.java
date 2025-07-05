@@ -17,6 +17,7 @@ public abstract class ColumnData<V> {
 
     protected V value;
     protected V defaultValue;
+    protected boolean compareCache = true;
 
 
     @SneakyThrows
@@ -26,6 +27,20 @@ public abstract class ColumnData<V> {
         }
         this.defaultValue = defaultValue;
         this.value = defaultValue;
+    }
+    @SneakyThrows
+    protected ColumnData(V defaultValue, boolean compareCache) {
+        if (defaultValue == null) {
+            throw new ConstructorFailThrowable();
+        }
+        this.defaultValue = defaultValue;
+        this.value = defaultValue;
+        this.compareCache = compareCache;
+    }
+
+    protected ColumnData<V> compareCache(boolean compareCache) {
+        this.compareCache = compareCache;
+        return this;
     }
 
     public V getValueOrDefault() {

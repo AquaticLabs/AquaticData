@@ -1,6 +1,7 @@
 package io.aquaticlabs.aquaticdata.tasks;
 
 import io.aquaticlabs.aquaticdata.util.DataDebugLog;
+import io.aquaticlabs.aquaticdata.util.DataDebugLogType;
 import io.aquaticlabs.aquaticdata.util.FactoryExistsThrowable;
 import lombok.Getter;
 
@@ -72,7 +73,7 @@ public class TaskFactory {
 
     public SimpleTask runTask(AquaticRunnable runnable) {
         if (isShuttingDown.get()) {
-            DataDebugLog.logDebug("Task creation ignored as Task Factory is shutting down: " + ownerID);
+            DataDebugLog.logDebug(DataDebugLogType.TASK_CREATION, "Task creation ignored as Task Factory is shutting down: " + ownerID);
             return null; // or an appropriate no-op task if needed
         }
         SimpleTask task = new SimpleTask(this, scheduledExecutorService, runnable);
@@ -114,7 +115,7 @@ public class TaskFactory {
      */
     public RepeatingTask createRepeatingTask(AquaticRunnable runnable, long interval, long delay, TimeUnit timeUnit) {
         if (isShuttingDown.get()) {
-            DataDebugLog.logDebug("Task creation ignored as Task Factory is shutting down: " + ownerID);
+            DataDebugLog.logDebug(DataDebugLogType.TASK_CREATION, "Task creation ignored as Task Factory is shutting down: " + ownerID);
             return null; // or an appropriate no-op task if needed
         }
         RepeatingTask task = new RepeatingTask(this, scheduledExecutorService, runnable, interval, delay, timeUnit);
@@ -131,7 +132,7 @@ public class TaskFactory {
      */
     public DelayedTask createDelayedTask(AquaticRunnable runnable, long delay) {
         if (isShuttingDown.get()) {
-            DataDebugLog.logDebug("Task creation ignored as Task Factory is shutting down: " + ownerID);
+            DataDebugLog.logDebug(DataDebugLogType.TASK_CREATION, "Task creation ignored as Task Factory is shutting down: " + ownerID);
             return null; // or an appropriate no-op task if needed
         }
         DelayedTask task = new DelayedTask(this, scheduledExecutorService, runnable, delay);

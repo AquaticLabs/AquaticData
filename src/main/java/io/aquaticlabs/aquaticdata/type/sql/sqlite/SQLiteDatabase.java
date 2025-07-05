@@ -13,6 +13,7 @@ import io.aquaticlabs.aquaticdata.type.sql.SQLColumnData;
 import io.aquaticlabs.aquaticdata.type.sql.SQLColumnType;
 import io.aquaticlabs.aquaticdata.type.sql.SQLDatabase;
 import io.aquaticlabs.aquaticdata.util.DataDebugLog;
+import io.aquaticlabs.aquaticdata.util.DataDebugLogType;
 import io.aquaticlabs.aquaticdata.util.StorageUtil;
 import lombok.NonNull;
 
@@ -87,7 +88,7 @@ public class SQLiteDatabase<T extends StorageModel> extends SQLDatabase<T> {
                     .append(" NOT NULL");
         }
         builder.append(") ");
-        DataDebugLog.logDebug(builder.toString());
+        DataDebugLog.logDebug(DataDebugLogType.SQL_QUERIES, builder.toString());
 
         return builder.toString();
     }
@@ -110,16 +111,16 @@ public class SQLiteDatabase<T extends StorageModel> extends SQLDatabase<T> {
         try (PreparedStatement dropTempTable = connection.prepareStatement(dropConflict)) {
             dropTempTable.executeUpdate();
         } catch (SQLException ex) {
-            DataDebugLog.logDebug("Failed to drop temp table: " + ex.getMessage());
+            DataDebugLog.logDebug(DataDebugLogType.SQL_EXCEPTIONS, "Failed to drop temp table: " + ex.getMessage());
         }
 
         // Rename original table
         String renameTableStmt = "ALTER TABLE " + getCredential().getTableName() + " RENAME TO " + tempTableName + ";";
         try (PreparedStatement renameTable = connection.prepareStatement(renameTableStmt)) {
             renameTable.executeUpdate();
-            DataDebugLog.logDebug("Table renamed to: " + tempTableName);
+            DataDebugLog.logDebug(DataDebugLogType.ALL_SQL, "Table renamed to: " + tempTableName);
         } catch (SQLException ex) {
-            DataDebugLog.logDebug("Failed to rename table: " + ex.getMessage());
+            DataDebugLog.logDebug(DataDebugLogType.SQL_EXCEPTIONS, "Failed to rename table: " + ex.getMessage());
             return;
         }
 
@@ -127,7 +128,7 @@ public class SQLiteDatabase<T extends StorageModel> extends SQLDatabase<T> {
         try {
             connection.createStatement().executeUpdate(createTableStatement(true));
         } catch (SQLException ex) {
-            DataDebugLog.logDebug("Failed to create new table: " + ex.getMessage());
+            DataDebugLog.logDebug(DataDebugLogType.ALL_SQL, "Failed to create new table: " + ex.getMessage());
             return;
         }
         String targetTable = getCredential().getTableName();
@@ -138,7 +139,7 @@ public class SQLiteDatabase<T extends StorageModel> extends SQLDatabase<T> {
             List<String> matchingColumns = getMatchingColumns(connection, tempTableName, targetTable);
 
             if (matchingColumns.isEmpty()) {
-                DataDebugLog.logDebug("No matching columns found between the tables.");
+                DataDebugLog.logDebug(DataDebugLogType.ALL_SQL, "No matching columns found between the tables.");
                 return;
             }
             copyData(connection, tempTableName, targetTable);
@@ -155,14 +156,14 @@ public class SQLiteDatabase<T extends StorageModel> extends SQLDatabase<T> {
         String dropStmt = "DROP TABLE '" + tempTableName + "'";
         try (PreparedStatement dropStatement = connection.prepareStatement(dropStmt)) {
             dropStatement.executeUpdate();
-            DataDebugLog.logDebug("Dropping table: " + tempTableName);
+            DataDebugLog.logDebug(DataDebugLogType.ALL_SQL, "Dropping table: " + tempTableName);
         } catch (Exception ex) {
-            DataDebugLog.logDebug("Failed to Drop temp Table. " + ex.getMessage());
+            DataDebugLog.logDebug(DataDebugLogType.SQL_EXCEPTIONS, "Failed to Drop temp Table. " + ex.getMessage());
         }
 
         long loadEnd = System.currentTimeMillis();
         long loadElapsedTime = loadEnd - loadStart;
-        DataDebugLog.logDebug("Data Conversion Loading time: " + loadElapsedTime + "ms");
+        DataDebugLog.logDebug(DataDebugLogType.ALL_SQL, "Data Conversion Loading time: " + loadElapsedTime + "ms");
         //DataDebugLog.logDebug("Data Conversion Loading time: " + loadElapsedTime + "ms");
     }
 
@@ -202,12 +203,12 @@ public class SQLiteDatabase<T extends StorageModel> extends SQLDatabase<T> {
                 targetTable, insertColumns, selectClause, sourceTable
         );
 
-        DataDebugLog.logDebug(copyQuery);
+        DataDebugLog.logDebug(DataDebugLogType.SQL_QUERIES, copyQuery);
 
         // Execute the query
         try (Statement stmt = connection.createStatement()) {
             int rowsCopied = stmt.executeUpdate(copyQuery);
-            DataDebugLog.logDebug("Copied " + rowsCopied + " rows from " + sourceTable + " to " + targetTable);
+            DataDebugLog.logDebug(DataDebugLogType.ALL_SQL, "Copied " + rowsCopied + " rows from " + sourceTable + " to " + targetTable);
         }
     }
 
@@ -265,7 +266,7 @@ public class SQLiteDatabase<T extends StorageModel> extends SQLDatabase<T> {
         }
         builder.append(")");
 
-        DataDebugLog.logDebug(builder.toString());
+        DataDebugLog.logDebug(DataDebugLogType.SQL_QUERIES, builder.toString());
         return builder.toString();
     }
 
@@ -302,7 +303,7 @@ public class SQLiteDatabase<T extends StorageModel> extends SQLDatabase<T> {
                 .append(value)
                 .append("';");
 
-        DataDebugLog.logDebug(builder.toString());
+        DataDebugLog.logDebug(DataDebugLogType.SQL_QUERIES, builder.toString());
 
         return builder.toString();
     }
@@ -314,7 +315,7 @@ public class SQLiteDatabase<T extends StorageModel> extends SQLDatabase<T> {
             try (PreparedStatement preparedStatement = connection.prepareStatement(dropConflict)) {
                 preparedStatement.executeUpdate();
             } catch (Exception ex) {
-                DataDebugLog.logDebug("Sqlite Failed to drop if exists Table. " + ex.getMessage());
+                DataDebugLog.logDebug(DataDebugLogType.SQL_EXCEPTIONS, "Sqlite Failed to drop if exists Table. " + ex.getMessage());
             }
             return null;
         }, getSyncExecutor()));

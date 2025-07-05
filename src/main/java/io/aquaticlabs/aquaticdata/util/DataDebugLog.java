@@ -6,6 +6,9 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
@@ -20,12 +23,15 @@ import java.util.logging.SimpleFormatter;
 
 public class DataDebugLog {
 
+
     @Getter
     @Setter
     private static boolean debug = false;
 
     private static final Logger logger;
     private static final Logger publicLogger;
+
+    private static Set<DataDebugLogType> activeLogTypes = new HashSet<>();
 
     static {
         logger = Logger.getLogger(DataDebugLog.class.getSimpleName());
@@ -61,10 +67,15 @@ public class DataDebugLog {
     }
 
 
-    public static void logDebug(Object debugMessage) {
-        if (debug) {
-            logger.log(Level.INFO, "Database Debug: " + debugMessage);
+    public static void logDebug(DataDebugLogType logType, Object debugMessage) {
+        if (debug && activeLogTypes.contains(logType)) {
+            logger.log(Level.INFO, "Log Type: " + logType.name() + " : " + debugMessage);
         }
+    }
+
+    public static void setActiveLogTypes(DataDebugLogType... types) {
+        activeLogTypes.clear();
+        activeLogTypes.addAll(List.of(types));
     }
 
     public static void logConsole(Object debug) {

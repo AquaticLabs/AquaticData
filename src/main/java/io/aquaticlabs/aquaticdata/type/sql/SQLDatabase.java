@@ -12,6 +12,7 @@ import io.aquaticlabs.aquaticdata.storage.Storage;
 import io.aquaticlabs.aquaticdata.type.ColumnData;
 import io.aquaticlabs.aquaticdata.type.sql.sqlite.SQLiteCredential;
 import io.aquaticlabs.aquaticdata.util.DataDebugLog;
+import io.aquaticlabs.aquaticdata.util.DataDebugLogType;
 import io.aquaticlabs.aquaticdata.util.DataEntry;
 import io.aquaticlabs.aquaticdata.util.StorageUtil;
 import lombok.Getter;
@@ -140,7 +141,7 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
                 try {
                     for (T object : loaded) {
 
-                        DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Saving Loaded:" + object.getKey());
+                        DataDebugLog.logDebug(DataDebugLogType.SQL_SAVING, getDataClass().getSimpleName() + " Database: Saving Loaded:" + object.getKey());
 
                         SerializedData data = new SerializedData();
                         getSerializer().serialize(object, data);
@@ -150,7 +151,7 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
 
                         // If the size is 1, it should only contain the key.
                         if (needsUpdate.getColumnStructure().size() == 1) {
-                            DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Needs update contains no data values. no need for updating");
+                            DataDebugLog.logDebug(DataDebugLogType.SQL_UPDATE, getDataClass().getSimpleName() + " Database: Needs update contains no data values. no need for updating");
                             continue;
                         }
 
@@ -158,24 +159,24 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
                         DatabaseStructure modifiedStructure = data.toDatabaseStructure(getTableStructure());
                         boolean exists = existingEntries.containsKey(object.getKey());
 
-                        DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: exists: " + exists);
+                        DataDebugLog.logDebug(DataDebugLogType.SQL_SAVING, getDataClass().getSimpleName() + " Database: exists: " + exists);
 
                         if (exists) {
                             try {
-                                DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Adding Update Batch Statement");
+                                DataDebugLog.logDebug(DataDebugLogType.SQL_UPDATE, getDataClass().getSimpleName() + " Database: Adding Update Batch Statement");
                                 statement.addBatch(updateStatement(needsUpdate));
                                 saved.add(object);
                             } catch (SQLException e) {
-                                DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Failed adding batch Data: " + e.getMessage());
+                                DataDebugLog.logDebug(DataDebugLogType.SQL_SAVING, getDataClass().getSimpleName() + " Database: Failed adding batch Data: " + e.getMessage());
                                 continue;
                             }
                         } else {
                             try {
-                                DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Adding Insert Batch Statement");
+                                DataDebugLog.logDebug(DataDebugLogType.SQL_INSERT, getDataClass().getSimpleName() + " Database: Adding Insert Batch Statement");
                                 statement.addBatch(insertStatement(modifiedStructure));
                                 saved.add(object);
                             } catch (SQLException e) {
-                                DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Fail Inserting Data: " + e.getMessage());
+                                DataDebugLog.logDebug(DataDebugLogType.SQL_SAVING, getDataClass().getSimpleName() + " Database: Fail Inserting Data: " + e.getMessage());
                                 continue;
                             }
                         }
@@ -185,13 +186,13 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
                             try {
                                 statement.executeBatch();
                                 statement.clearBatch();
-                                DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Success executing batch of " + modified);
+                                DataDebugLog.logDebug(DataDebugLogType.SQL_SAVING, getDataClass().getSimpleName() + " Database: Success executing batch of " + modified);
                             } catch (SQLException e) {
-                                DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Failed executing batch: " + e.getMessage());
+                                DataDebugLog.logDebug(DataDebugLogType.SQL_SAVING, getDataClass().getSimpleName() + " Database: Failed executing batch: " + e.getMessage());
                             }
                         }
                     }
-                    DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Executing Last batch of " + modified);
+                    DataDebugLog.logDebug(DataDebugLogType.SQL_SAVING, getDataClass().getSimpleName() + " Database: Executing Last batch of " + modified);
                     statement.executeBatch();
                     statement.clearBatch();
                     connection.commit(); // Commit the transaction
@@ -201,7 +202,7 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
                 connection.setAutoCommit(true);
 
                 future.complete(saved);
-                DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Saved Loaded, Modified " + modified + " users.");
+                DataDebugLog.logDebug(DataDebugLogType.SQL_SAVING, getDataClass().getSimpleName() + " Database: Saved Loaded, Modified " + modified + " users.");
                 return true;
             }
         }, useRunner ? executor : null));
@@ -231,7 +232,7 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
                 try {
                     for (T object : list) {
 
-                        DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Saving List: " + object.getKey());
+                        DataDebugLog.logDebug(DataDebugLogType.SQL_SAVING, getDataClass().getSimpleName() + " Database: Saving List: " + object.getKey());
 
                         SerializedData data = new SerializedData();
                         getSerializer().serialize(object, data);
@@ -240,7 +241,7 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
 
                         // If the size is 1, it should only contain the key.
                         if (needsUpdate.getColumnStructure().size() == 1) {
-                            DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Needs update contains no data values. no need for updating");
+                            DataDebugLog.logDebug(DataDebugLogType.SQL_UPDATE, getDataClass().getSimpleName() + " Database: Needs update contains no data values. no need for updating");
                             continue;
                         }
 
@@ -249,19 +250,19 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
                         if (doesEntryExist(connection, modifiedStructure.getFirstValuePair())) {
 
                             try {
-                                DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Adding Update Batch Statement");
+                                DataDebugLog.logDebug(DataDebugLogType.SQL_UPDATE, getDataClass().getSimpleName() + " Database: Adding Update Batch Statement");
                                 statement.addBatch(updateStatement(needsUpdate));
                                 saved.add(object);
                             } catch (SQLException e) {
-                                DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Failed adding batch Data: " + e.getMessage());
+                                DataDebugLog.logDebug(DataDebugLogType.SQL_SAVING, getDataClass().getSimpleName() + " Database: Failed adding batch Data: " + e.getMessage());
                             }
                         } else {
                             try {
-                                DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Adding Insert Batch Statement");
+                                DataDebugLog.logDebug(DataDebugLogType.SQL_INSERT, getDataClass().getSimpleName() + " Database: Adding Insert Batch Statement");
                                 statement.addBatch(insertStatement(modifiedStructure));
                                 saved.add(object);
                             } catch (SQLException e) {
-                                DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Fail Inserting Data: " + e.getMessage());
+                                DataDebugLog.logDebug(DataDebugLogType.SQL_INSERT, getDataClass().getSimpleName() + " Database: Fail Inserting Data: " + e.getMessage());
                             }
                         }
 
@@ -271,14 +272,14 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
                                 statement.executeBatch();
                                 statement.clearBatch();
 
-                                DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Success executing batch of " + modified);
+                                DataDebugLog.logDebug(DataDebugLogType.SQL_SAVING, getDataClass().getSimpleName() + " Database: Success executing batch of " + modified);
 
                             } catch (SQLException e) {
-                                DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Failed executing batch: " + e.getMessage());
+                                DataDebugLog.logDebug(DataDebugLogType.SQL_SAVING, getDataClass().getSimpleName() + " Database: Failed executing batch: " + e.getMessage());
                             }
                         }
                     }
-                    DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Executing Last batch of " + modified);
+                    DataDebugLog.logDebug(DataDebugLogType.SQL_SAVING, getDataClass().getSimpleName() + " Database: Executing Last batch of " + modified);
                     statement.executeBatch();
 
                     connection.commit(); // Commit the transaction
@@ -288,7 +289,7 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
                 connection.setAutoCommit(true);
 
                 future.complete(saved);
-                DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Saved List, Modified " + modified + " users.");
+                DataDebugLog.logDebug(DataDebugLogType.SQL_SAVING, getDataClass().getSimpleName() + " Database: Saved List, Modified " + modified + " users.");
                 return true;
             }
         }, executor));
@@ -316,7 +317,7 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
         DatabaseStructure needsUpdate = buildNeedsUpdate(object, data);
         // If the size is 1, it should only contain the key.
         if (needsUpdate.getColumnStructure().size() == 1) {
-            DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Needs update contains no data values. no need for updating");
+            DataDebugLog.logDebug(DataDebugLogType.SQL_SAVING, getDataClass().getSimpleName() + " Database: Needs update contains no data values. no need for updating");
             return null;
         }
 
@@ -326,16 +327,16 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
             if (doesEntryExist(connection, modifiedStructure.getFirstValuePair())) {
                 try {
                     connection.createStatement().executeUpdate(updateStatement(needsUpdate));
-                    DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Success Updating Data");
+                    DataDebugLog.logDebug(DataDebugLogType.SQL_UPDATE, getDataClass().getSimpleName() + " Database: Success Updating Data");
                 } catch (SQLException e) {
-                    DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Fail Updating Data: " + e.getMessage());
+                    DataDebugLog.logDebug(DataDebugLogType.SQL_UPDATE, getDataClass().getSimpleName() + " Database: Fail Updating Data: " + e.getMessage());
                 }
             } else {
                 try {
                     connection.createStatement().executeUpdate(insertStatement(modifiedStructure));
-                    DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Success Inserting Data");
+                    DataDebugLog.logDebug(DataDebugLogType.SQL_INSERT, getDataClass().getSimpleName() + " Database: Success Inserting Data");
                 } catch (SQLException e) {
-                    DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Fail Inserting Data: " + e.getMessage());
+                    DataDebugLog.logDebug(DataDebugLogType.SQL_INSERT, getDataClass().getSimpleName() + " Database: Fail Inserting Data: " + e.getMessage());
                 }
             }
             future.complete(object);
@@ -387,7 +388,7 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
                     column++;
                 }
 
-                DataDebugLog.logDebug(sql);
+                DataDebugLog.logDebug(DataDebugLogType.SQL_QUERIES, sql);
                 SerializedData serializedData = new SerializedData();
                 serializedData.fromQuery(data);
                 T dummy = getSerializer().deserialize(holder.get(key.getValue()), serializedData);
@@ -457,7 +458,7 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
                         loaded.add(dummy);
 
                     } catch (Exception exception) {
-                        DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Failed to deserialize class, with data: " + serializedData);
+                        DataDebugLog.logDebug(DataDebugLogType.SQL_LOADING, getDataClass().getSimpleName() + " Database: Failed to deserialize class, with data: " + serializedData);
                         DataDebugLog.logError(exception.getMessage());
                     }
                 });
@@ -517,7 +518,7 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
                         loadIntoCache(entry, serializedData);
                         loaded.add(entry);
                     } catch (Exception exception) {
-                        DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Failed to deserialize class, with data: " + serializedData);
+                        DataDebugLog.logDebug(DataDebugLogType.SQL_LOADING, getDataClass().getSimpleName() + " Database: Failed to deserialize class, with data: " + serializedData);
                         DataDebugLog.logError(exception.getMessage());
                     }
                 });
@@ -540,7 +541,7 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
             try (Statement stmt = conn.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY)) {
 
                 String query = "SELECT " + String.join(", ", keyColumns) + " FROM " + credential.getTableName() + ";";
-                DataDebugLog.logDebug(query);
+                DataDebugLog.logDebug(DataDebugLogType.SQL_QUERIES, query);
                 ResultSet rs = stmt.executeQuery(query);
 
 
@@ -655,9 +656,10 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
                 first = false;
                 continue;
             }
+            if (!columnData.isCompareCache()) continue;
             if (!data.getValue(entry.getKey()).isPresent() || cachedData.isOutdated(column, columnData.getValueOrDefault().toString())) {
                 needsUpdate.addValue(column, columnData);
-                DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Needs Update: " + column + " " + columnData.getValueOrDefault());
+                DataDebugLog.logDebug(DataDebugLogType.SQL_UPDATE, getDataClass().getSimpleName() + " Database: Needs Update: " + column + " " + columnData.getValueOrDefault());
             }
         }
         return needsUpdate;
@@ -736,7 +738,7 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
         } catch (Exception e) {
             throw new IllegalStateException("Failed to confirm table, strange Column Types/Names.", e);
         }
-        DataDebugLog.logDebug(getDataClass().getSimpleName() + " Database: Table Needs Alter: " + needsAltering);
+        DataDebugLog.logDebug(DataDebugLogType.ALL_SQL, getDataClass().getSimpleName() + " Database: Table Needs Alter: " + needsAltering);
 
         return needsAltering;
     }
@@ -773,16 +775,6 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
             }
         }
         return existingEntries;
-    }
-
-    protected void executeBatchSafely(PreparedStatement statement, int count) {
-        try {
-            statement.executeBatch();
-            statement.clearBatch();
-            DataDebugLog.logDebug("Executed batch of " + count + " rows.");
-        } catch (SQLException ex) {
-            DataDebugLog.logDebug("Batch execution failed: " + ex.getMessage());
-        }
     }
 
     public <S> void executeSQLRequest(ConnectionRequest<S> request) {

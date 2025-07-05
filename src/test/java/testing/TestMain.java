@@ -76,7 +76,7 @@ class TestMain {
     void addBulk() throws ExecutionException, InterruptedException, TimeoutException {
         for (int i = 0; i < 10000; i++) {
             TestData data = new TestData(UUID.randomUUID());
-            data.setName("Tony: " + i);
+            data.setName("Armando: " + i);
             data.setValue(randomNumber(1, 100000));
             holder.add(data);
         }
@@ -119,32 +119,6 @@ class TestMain {
 
         System.out.println("ranks");
     }
-
-
-/*
-    void testGetSortedList() throws ExecutionException, InterruptedException, TimeoutException {
-
-        try {
-            List<SimpleStorageModel> sortedList = holder.getSortedDataList("value").get(1, TimeUnit.MINUTES);
-            Assertions.assertFalse(sortedList.isEmpty());
-            int firstVal = -1;
-            for (SimpleStorageModel model : sortedList) {
-                if (firstVal == -1) {
-                    firstVal = (int) model.getValue("value");
-                }
-                System.out.println("Key: " + model.getKey() + " Name: " + model.getValue("name") + " Value: " + model.getValue("value"));
-            }
-            int lastVal = (int) sortedList.get(sortedList.size() - 1).getValue("value");
-
-            Assertions.assertTrue(firstVal > lastVal);
-
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-*/
-
 
     public static Integer randomNumber(int min, int max) {
         Random i = new Random();

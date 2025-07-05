@@ -11,6 +11,7 @@ import io.aquaticlabs.aquaticdata.type.sql.SQLColumnData;
 import io.aquaticlabs.aquaticdata.type.sql.SQLColumnType;
 import io.aquaticlabs.aquaticdata.type.sql.SQLDatabase;
 import io.aquaticlabs.aquaticdata.util.DataDebugLog;
+import io.aquaticlabs.aquaticdata.util.DataDebugLogType;
 import io.aquaticlabs.aquaticdata.util.StorageUtil;
 import lombok.NonNull;
 
@@ -101,7 +102,7 @@ public class MySQLDatabase<T extends StorageModel> extends SQLDatabase<T> {
         builder.append(", PRIMARY KEY ( ")
                 .append(primaryKeyColumn)
                 .append(" ));");
-        DataDebugLog.logDebug(builder.toString());
+        DataDebugLog.logDebug(DataDebugLogType.SQL_QUERIES, builder.toString());
 
         return builder.toString();
     }
@@ -144,10 +145,10 @@ public class MySQLDatabase<T extends StorageModel> extends SQLDatabase<T> {
                 statement.addBatch(batch);
             }
             statement.executeBatch();
-            DataDebugLog.logDebug("Success executing alter table batches.");
+            DataDebugLog.logDebug(DataDebugLogType.ALL_SQL, "Success executing alter table batches.");
 
         } catch (Exception ex) {
-            DataDebugLog.logDebug("Failed to Alter Table. " + ex.getMessage());
+            DataDebugLog.logDebug(DataDebugLogType.SQL_EXCEPTIONS, "Failed to Alter Table. " + ex.getMessage());
         }
     }
 
@@ -179,7 +180,7 @@ public class MySQLDatabase<T extends StorageModel> extends SQLDatabase<T> {
         }
         builder.append(")");
 
-        DataDebugLog.logDebug(builder.toString());
+        DataDebugLog.logDebug(DataDebugLogType.SQL_QUERIES, builder.toString());
         return builder.toString();
     }
 
@@ -212,7 +213,7 @@ public class MySQLDatabase<T extends StorageModel> extends SQLDatabase<T> {
                 .append(value)
                 .append("';");
 
-        DataDebugLog.logDebug(builder.toString());
+        DataDebugLog.logDebug(DataDebugLogType.SQL_QUERIES, builder.toString());
 
         return builder.toString();
     }
@@ -224,7 +225,7 @@ public class MySQLDatabase<T extends StorageModel> extends SQLDatabase<T> {
             try (PreparedStatement preparedStatement = connection.prepareStatement(dropConflict)) {
                 preparedStatement.executeUpdate();
             } catch (Exception ex) {
-                DataDebugLog.logDebug("MySQL Failed to drop if exists Table. " + ex.getMessage());
+                DataDebugLog.logDebug(DataDebugLogType.SQL_EXCEPTIONS, "MySQL Failed to drop if exists Table. " + ex.getMessage());
             }
             return null;
         }, getSyncExecutor()));
