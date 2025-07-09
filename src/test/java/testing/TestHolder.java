@@ -9,12 +9,11 @@ import io.aquaticlabs.aquaticdata.storage.StorageHolder;
 import io.aquaticlabs.aquaticdata.storage.StorageMode;
 import io.aquaticlabs.aquaticdata.type.DataCredential;
 import io.aquaticlabs.aquaticdata.type.sql.SQLColumnData;
-import io.aquaticlabs.aquaticdata.type.sql.SQLColumnType;
 import io.aquaticlabs.aquaticdata.type.sql.SQLDatabase;
 import io.aquaticlabs.aquaticdata.util.DataEntry;
 import io.aquaticlabs.aquaticdata.util.MutableSingle;
 import lombok.Getter;
-import testing.newtest.LogData;
+
 
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;

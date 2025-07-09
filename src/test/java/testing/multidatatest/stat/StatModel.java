@@ -14,6 +14,23 @@ public class StatModel implements StorageModel {
     private String name;
     private int value;
 
+
+    public StatModel() {
+    }
+
+    public StatModel(UUID uuid) {
+        this.uuidKey = uuid;
+    }
+
+    @Override
+    public String toString() {
+        return "StatModel{" +
+                "uuidKey=" + uuidKey +
+                ", name='" + name + '\'' +
+                ", value=" + value +
+                '}';
+    }
+
     @Override
     public Object getKey() {
         return uuidKey;

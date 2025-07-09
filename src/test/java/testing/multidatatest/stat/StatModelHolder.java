@@ -8,40 +8,43 @@ import io.aquaticlabs.aquaticdata.storage.StorageMode;
 import io.aquaticlabs.aquaticdata.type.DataCredential;
 import io.aquaticlabs.aquaticdata.type.sql.SQLColumnData;
 import io.aquaticlabs.aquaticdata.util.DataEntry;
-import testing.TestData;
 
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 public class StatModelHolder extends StorageHolder<UUID, StatModel> {
 
     private int lastLoadedDataSize;
-    private final DataCredential credential;
 
     public StatModelHolder(DataCredential credential) {
         super(credential, UUID.class, StatModel.class, StorageMode.LOAD_AND_REMOVE, CompletableFuture::runAsync, Runnable::run);
-        this.credential = credential;
         loadDatabase();
     }
 
     public StatModel loadOrInsert(UUID uuid) {
         StatModel model;
         try {
-            model = load(new DataEntry<>("uuid", uuid), true).get(1, TimeUnit.SECONDS);
+            model = load(new DataEntry<>("uuid", uuid), false).get(1, TimeUnit.SECONDS);
             return model;
         } catch (Exception e) {
-
+            e.printStackTrace();
         }
-        model = new StatModel();
+        model = new StatModel(uuid);
         return null;
     }
 
     public StatModel insert(StatModel statModel) {
         add(statModel);
-        save(statModel, true);
+        try {
+            save(statModel, true).get(1, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
         return statModel;
     }
 
@@ -69,6 +72,10 @@ public class StatModelHolder extends StorageHolder<UUID, StatModel> {
     public StatModel get(UUID key) {
         // Not needed, never holding modelObjects in memory.
         return null;
+    }
+
+    public void saveAll(boolean async) throws ExecutionException, InterruptedException, TimeoutException {
+        super.saveLoaded(async).get(1000, TimeUnit.MILLISECONDS);
     }
 
     @Override
