@@ -3,6 +3,8 @@ package io.aquaticlabs.aquaticdata.util;
 public enum DataDebugLogType {
 
 
+    DATABASE_STARTUP,
+    DATABASE_SHUTDOWN,
     ALL_SQL,
     SQL_SAVING,
     SQL_LOADING,
@@ -16,6 +18,7 @@ public enum DataDebugLogType {
     TASK_ADDED_TO_QUEUE,
     TASK_CLOSED_CONNECTION,
     TASK_CREATION,
+    TASK_SHUTDOWN,
 
     OTHER
 

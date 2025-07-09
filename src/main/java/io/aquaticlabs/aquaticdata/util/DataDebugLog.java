@@ -31,7 +31,7 @@ public class DataDebugLog {
     private static final Logger logger;
     private static final Logger publicLogger;
 
-    private static Set<DataDebugLogType> activeLogTypes = new HashSet<>();
+    private static final Set<DataDebugLogType> activeLogTypes = new HashSet<>();
 
     static {
         logger = Logger.getLogger(DataDebugLog.class.getSimpleName());

@@ -165,6 +165,11 @@ public class TestHolder extends StorageHolder<UUID, TestData> {
         return getStorageModelMap(keyColumns, async).get(5, TimeUnit.SECONDS);
     }
 
+
+    public CompletableFuture<List<SimpleStorageModel>> buildSortedStorageList(DatabaseStructure structure, String sortByCol, SQLDatabase.SortOrder sortOrder, int limit, boolean async) {
+        return getSortedListByColumn(structure, sortByCol, sortOrder, limit, 0, false);
+    }
+
 /*
     public CompletableFuture<List<SimpleStorageModel>> getSortedDataList(String sortColumn) {
         DatabaseStructure structure = new DatabaseStructure();

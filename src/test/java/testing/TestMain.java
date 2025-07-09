@@ -1,11 +1,15 @@
 package testing;
 
 
+import io.aquaticlabs.aquaticdata.DatabaseStructure;
 import io.aquaticlabs.aquaticdata.model.SimpleStorageModel;
 import io.aquaticlabs.aquaticdata.tasks.AquaticRunnable;
 import io.aquaticlabs.aquaticdata.tasks.TaskFactory;
+import io.aquaticlabs.aquaticdata.type.sql.SQLColumnData;
+import io.aquaticlabs.aquaticdata.type.sql.SQLDatabase;
 import io.aquaticlabs.aquaticdata.type.sql.sqlite.SQLiteCredential;
 import io.aquaticlabs.aquaticdata.util.DataDebugLog;
+import io.aquaticlabs.aquaticdata.util.DataDebugLogType;
 import io.aquaticlabs.aquaticdata.util.DataEntry;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -20,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -37,6 +42,7 @@ class TestMain {
     @BeforeEach
     void setup() {
         DataDebugLog.setDebug(true);
+        DataDebugLog.setActiveLogTypes(DataDebugLogType.SQL_EXCEPTIONS, DataDebugLogType.DATABASE_STARTUP, DataDebugLogType.SQL_LOADING);
 
         // holder = new TestHolder(new JsonCredential("TestingSB", "TestingTable", new File( "data.json")));
         holder = new TestHolder(new SQLiteCredential("TestingSB", "TestingTable", new File("")));
@@ -72,11 +78,11 @@ class TestMain {
         Assertions.assertEquals(data.getValue(), loadedData.getValue());
     }
 
-    //@Test
+    //  @Test
     void addBulk() throws ExecutionException, InterruptedException, TimeoutException {
-        for (int i = 0; i < 10000; i++) {
+        for (int i = 0; i < 400000; i++) {
             TestData data = new TestData(UUID.randomUUID());
-            data.setName("Armando: " + i);
+            data.setName("Jackson: " + i);
             data.setValue(randomNumber(1, 100000));
             holder.add(data);
         }
@@ -85,6 +91,29 @@ class TestMain {
     }
 
     @Test
+    void testNewRank() {
+
+        DatabaseStructure structure = new DatabaseStructure();
+        structure.addColumn("uuid", new SQLColumnData<>(UUID.class));
+        structure.addColumn("name", new SQLColumnData<>(String.class));
+        structure.addColumn("value", new SQLColumnData<>(Integer.class));
+        CompletableFuture<List<SimpleStorageModel>> future = holder.buildSortedStorageList(structure, "value", SQLDatabase.SortOrder.DESC, 25, true);
+
+        try {
+            List<SimpleStorageModel> list = future.get(10, TimeUnit.SECONDS);
+            int i = 1;
+            for (SimpleStorageModel model : list) {
+                System.out.println("top #" + i + " name: " + model.getValue("name") + " val: " + model.getValue("value"));
+                i++;
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+    }
+
+    //@Test
     void testRank() throws Exception {
         System.out.println("1");
 
@@ -92,10 +121,11 @@ class TestMain {
         keyCols.add("uuid");
         keyCols.add("name");
         keyCols.add("value");
+
         Map<UUID, SimpleStorageModel> modelMap = holder.getStorageModelMap(keyCols, false).get(10, TimeUnit.SECONDS);
+
         Map<UUID, DataEntry<SimpleStorageModel, Object>> sortedMap = new LinkedHashMap<>();
         System.out.println(modelMap.size());
-        System.out.println(holder.getDataMap().size());
 
         Assertions.assertFalse(modelMap.isEmpty());
         int i = 0;
@@ -107,11 +137,12 @@ class TestMain {
             i++;
         }
         sortedMap = ObjectSorter.sortIntAndName(sortedMap);
+        System.out.println("Sorted Map Size: " + sortedMap.size());
 
         i = 1;
         for (Map.Entry<UUID, DataEntry<SimpleStorageModel, Object>> entry : sortedMap.entrySet()) {
             System.out.println("top i " + i + " name: " + entry.getValue().getKey().getValue("name") + " val: " + entry.getValue().getValue());
-            if (i >= 11) {
+            if (i >= 10) {
                 break;
             }
             i++;

@@ -7,6 +7,7 @@ import com.google.common.cache.RemovalListener;
 import io.aquaticlabs.aquaticdata.model.StorageModel;
 import io.aquaticlabs.aquaticdata.storage.Storage;
 import io.aquaticlabs.aquaticdata.util.DataDebugLog;
+import io.aquaticlabs.aquaticdata.util.DataDebugLogType;
 
 import java.time.Instant;
 import java.util.concurrent.TimeUnit;
@@ -54,7 +55,7 @@ public class ObjectCache<K, T extends StorageModel> {
             String cause = notification.getCause().name();
            // DataDebugLog.logDebug(timestamp + " Going to remove data from InputDataPool reason: " + cause);
             if (notification.getCause() == RemovalCause.EXPIRED) {
-                DataDebugLog.logDebug("This data expired: " + notification.getKey());
+                DataDebugLog.logDebug(DataDebugLogType.OTHER, "This data expired: " + notification.getKey());
                 holder.remove(notification.getValue());
             } else {
                 //DataDebugLog.logDebug(timestamp + " This data was manually removed: " + notification.getKey());

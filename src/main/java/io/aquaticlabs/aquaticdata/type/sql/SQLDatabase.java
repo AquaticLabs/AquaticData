@@ -27,8 +27,8 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
-import java.util.stream.Collectors;
 
 /**
  * @Author: extremesnow
@@ -123,7 +123,6 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
      * @param useRunner Whether to use a dedicated executor for the operation.
      * @param <S>       The iterable type that extends {@link Iterable} containing objects of type {@code T}.
      * @return A {@link CompletableFuture} containing the list of successfully saved objects.
-     * @throws SQLException If an error occurs during batch execution or database operations.
      */
     @Override
     public <S extends Iterable<T>> CompletableFuture<List<T>> saveLoaded(S loaded, boolean async, boolean useRunner) {
@@ -217,7 +216,6 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
      * @param list  The list of objects to be saved or updated.
      * @param async Whether to execute the operation asynchronously.
      * @return A {@link CompletableFuture} containing the list of successfully saved objects.
-     * @throws SQLException If an error occurs during batch execution or database operations.
      */
     @Override
     public CompletableFuture<List<T>> saveList(List<T> list, boolean async) {
@@ -304,7 +302,6 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
      * @param object The object of type {@code T} to be saved or updated.
      * @param async  Whether to execute the operation asynchronously.
      * @return A {@link CompletableFuture} containing the saved object.
-     * @throws SQLException If an error occurs while executing the SQL insert or update statement.
      */
     @Override
     public CompletableFuture<T> save(T object, boolean async) {
@@ -363,8 +360,6 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
      * @param persist Whether to persist the loaded entry in storage.
      * @param <K>     The key type of the storage holder.
      * @return A {@link CompletableFuture} containing the deserialized object of type {@code T}, or {@code null} if not found.
-     * @throws SQLException If an error occurs while executing the SQL query.
-     * @throws Exception    If deserialization of the query result fails.
      */
     @Override
     public <K> CompletableFuture<T> load(Storage<K, T> holder, DataEntry<String, K> key, boolean async, boolean persist) {
@@ -412,8 +407,6 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
      * @param async  Whether to execute the query asynchronously.
      * @param <K>    The key type of the storage holder.
      * @return A {@link CompletableFuture} containing a list of deserialized objects of type {@code T}.
-     * @throws SQLException If an error occurs while executing the SQL query.
-     * @throws Exception    If deserialization of query results fails.
      */
     @Override
     public <K> CompletableFuture<List<T>> loadAll(Storage<K, T> holder, boolean async) {
@@ -481,8 +474,6 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
      * @param keyValue  The value to match in the specified key column.
      * @param async     Whether to execute the query asynchronously.
      * @return A {@link CompletableFuture} containing a list of deserialized objects of type {@code T}.
-     * @throws SQLException If an error occurs while executing the SQL query.
-     * @throws Exception    If deserialization of query results fails.
      */
     @Override
     public CompletableFuture<List<T>> getKeyedList(String keyColumn, String keyValue, boolean async) {
@@ -533,30 +524,58 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
 
 
     @Override
-    public <K> CompletableFuture<Map<K, SimpleStorageModel>> getStorageModelMap(List<String> keyColumns, boolean async) {
+    public <K> CompletableFuture<Map<K, SimpleStorageModel>> getStorageModelMap(List<String> keyColumns, boolean async, Class<K> keyClass) {
         Executor executor = getExecutor(async);
         CompletableFuture<Map<K, SimpleStorageModel>> future = new CompletableFuture<>();
         executeRequest(new ConnectionRequest<>(conn -> {
-            Map<K, SimpleStorageModel> modelMap = new LinkedHashMap<>();
+            Map<K, SimpleStorageModel> modelMap = new ConcurrentHashMap<>();
             try (Statement stmt = conn.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY)) {
 
                 String query = "SELECT " + String.join(", ", keyColumns) + " FROM " + credential.getTableName() + ";";
                 DataDebugLog.logDebug(DataDebugLogType.SQL_QUERIES, query);
                 ResultSet rs = stmt.executeQuery(query);
 
-
-                SimpleStorageModel model = new SimpleStorageModel(getTableStructure().getKeyName());
-                for (String colKey : keyColumns) {
-                    try {
-                        Object colVal = rs.getObject(colKey);
-                        model.addValue(colKey, colVal);
-                    } catch (Exception e) {
-                        DataDebugLog.logError("Failed to build simple storage model: " + e.getMessage());
+                List<SQLColumnType> columnTypes = new ArrayList<>();
+                for (Map.Entry<String, ColumnData<?>> entry : getTableStructure().getColumnStructure().entrySet()) {
+                    SQLColumnData<?> columnData = (SQLColumnData<?>) entry.getValue();
+                    if (keyColumns.contains(entry.getKey())) {
+                        columnTypes.add(columnData.getColumnType());
                     }
                 }
+
+                List<List<StorageValue>> rowData = new ArrayList<>();
+                while (rs.next()) {
+                    List<StorageValue> data = new ArrayList<>();
+                    for (int i = 0; i < keyColumns.size(); i++) {
+                        data.add(new StorageValue(keyColumns.get(i), rs.getObject(keyColumns.get(i)), columnTypes.get(i)));
+                    }
+                    rowData.add(data);
+                }
+
+                rowData.parallelStream().forEach(data -> {
+                    SerializedData serializedData = new SerializedData();
+                    serializedData.fromQuery(data);
+                    try {
+                        SimpleStorageModel model = new SimpleStorageModel(getTableStructure().getKeyName());
+                        K key = serializedData.applyAs(model.getKey().toString(), keyClass);
+                        for (Map.Entry<String, Object> entry : serializedData.getValues().entrySet()) {
+                            try {
+                                model.addValue(entry.getKey(), entry.getValue());
+                            } catch (Exception e) {
+                                DataDebugLog.logError("Failed to build simple storage model: " + e.getMessage());
+                            }
+                        }
+                        modelMap.put(key, model);
+                    } catch (Exception exception) {
+                        DataDebugLog.logError("Failed to build simple storage model");
+                        DataDebugLog.logError(exception.getMessage());
+                    }
+                });
+
             } catch (SQLException e) {
                 DataDebugLog.logError("Failed to build Model Map of users: " + e.getMessage());
             }
+
             future.complete(modelMap);
             return null;
         }, executor));
@@ -575,7 +594,6 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
      * @param offset            The number of records to skip before retrieving results.
      * @param async             Whether to execute the query asynchronously.
      * @return A {@link CompletableFuture} containing a list of sorted {@link SimpleStorageModel} objects.
-     * @throws Exception If an error occurs while executing the SQL query or processing the results.
      */
     @Override
     public CompletableFuture<List<SimpleStorageModel>> getSortedListByColumn(DatabaseStructure databaseStructure, String sortByColumnName, SortOrder sortOrder, int limit, int offset, boolean async) {
@@ -657,7 +675,7 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
                 continue;
             }
             if (!columnData.isCompareCache()) continue;
-            if (!data.getValue(entry.getKey()).isPresent() || cachedData.isOutdated(column, columnData.getValueOrDefault().toString())) {
+            if (data.getValue(entry.getKey()).isEmpty() || cachedData.isOutdated(column, columnData.getValueOrDefault().toString())) {
                 needsUpdate.addValue(column, columnData);
                 DataDebugLog.logDebug(DataDebugLogType.SQL_UPDATE, getDataClass().getSimpleName() + " Database: Needs Update: " + column + " " + columnData.getValueOrDefault());
             }

@@ -21,6 +21,7 @@ import io.aquaticlabs.aquaticdata.tasks.TaskFactory;
 import io.aquaticlabs.aquaticdata.type.DataCredential;
 import io.aquaticlabs.aquaticdata.type.sql.SQLDatabase;
 import io.aquaticlabs.aquaticdata.util.DataDebugLog;
+import io.aquaticlabs.aquaticdata.util.DataDebugLogType;
 import io.aquaticlabs.aquaticdata.util.DataEntry;
 import lombok.NonNull;
 
@@ -62,7 +63,7 @@ public abstract class StorageHolder<K, T extends StorageModel> extends Storage<K
         }
         try {
             database.saveLoaded(this, false, false).whenComplete((v, t) -> {
-                DataDebugLog.logDebug("SaveLoaded on Shutdown.");
+                DataDebugLog.logDebug(DataDebugLogType.DATABASE_SHUTDOWN, "SaveLoaded on Shutdown.");
                 database.shutdown();
                 getTaskFactory().shutdown();
             });
@@ -106,8 +107,8 @@ public abstract class StorageHolder<K, T extends StorageModel> extends Storage<K
             cacheSaveTask = getTaskFactory().createRepeatingTask(new AquaticRunnable() {
                 @Override
                 public void run() {
-                    saveLoaded(true).whenComplete((users, t) -> DataDebugLog.logDebug("Cache Saved"));
-                    DataDebugLog.logDebug("TaskID: " + getTaskId() + " Task Owner: " + getOwnerID());
+                    saveLoaded(true).whenComplete((users, t) -> DataDebugLog.logDebug(DataDebugLogType.DATABASE_STARTUP, "Cache Saved"));
+                    DataDebugLog.logDebug(DataDebugLogType.DATABASE_STARTUP, "TaskID: " + getTaskId() + " Task Owner: " + getOwnerID());
                 }
             }, getCacheTimeInSecondsToSave());
         }
@@ -146,7 +147,7 @@ public abstract class StorageHolder<K, T extends StorageModel> extends Storage<K
     }
 
     public CompletableFuture<Map<K, SimpleStorageModel>> getStorageModelMap(List<String> keyColumns, boolean async) {
-        return database.getStorageModelMap(keyColumns, async);
+        return database.getStorageModelMap(keyColumns, async, getKeyClass());
     }
 
     protected void executeRequest(ConnectionRequest<?> connectionRequest) {

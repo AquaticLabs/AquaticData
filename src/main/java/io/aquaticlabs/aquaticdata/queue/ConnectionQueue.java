@@ -2,6 +2,7 @@ package io.aquaticlabs.aquaticdata.queue;
 
 import io.aquaticlabs.aquaticdata.Database;
 import io.aquaticlabs.aquaticdata.util.DataDebugLog;
+import io.aquaticlabs.aquaticdata.util.DataDebugLogType;
 import lombok.Getter;
 
 import java.util.ArrayList;
@@ -26,16 +27,16 @@ public class ConnectionQueue {
 
     public synchronized void tryToExecuteNextInQueue() {
         if (queuedRequests.isEmpty()) {
-            DataDebugLog.logDebug("Queue Empty.");
+            DataDebugLog.logDebug(DataDebugLogType.TASK_QUEUE, "Queue Empty.");
             queueRunning = false;
             return;
         }
         queueRunning = true;
-        DataDebugLog.logDebug("Executing Next in Queue. Queue Size: " + queuedRequests.size());
+        DataDebugLog.logDebug(DataDebugLogType.TASK_QUEUE, "Executing Next in Queue. Queue Size: " + queuedRequests.size());
         ConnectionRequest<?> connectionRequest = queuedRequests.remove(0);
         try {
             if (connectionRequest.getExecutor() == null) {
-                DataDebugLog.logDebug("Creating Connection Request with Null Executor.");
+                DataDebugLog.logDebug(DataDebugLogType.TASK_QUEUE, "Creating Connection Request with Null Executor.");
                 database.executeRequest(connectionRequest);
             } else {
                 connectionRequest.getExecutor().execute(() -> database.executeRequest(connectionRequest));
@@ -46,7 +47,7 @@ public class ConnectionQueue {
     }
 
     public void addConnectionRequest(ConnectionRequest<?> request) {
-        DataDebugLog.logDebug("Added new Connection Request");
+        DataDebugLog.logDebug(DataDebugLogType.TASK_ADDED_TO_QUEUE, "Added new Connection Request");
         queuedRequests.add(request);
         if (!queueRunning) {
             tryToExecuteNextInQueue();

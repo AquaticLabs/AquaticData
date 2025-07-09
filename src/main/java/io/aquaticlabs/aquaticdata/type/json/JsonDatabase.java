@@ -155,7 +155,7 @@ public class JsonDatabase<T extends StorageModel> extends Database<T> {
     }
 
     @Override
-    public <K> CompletableFuture<Map<K, SimpleStorageModel>> getStorageModelMap(List<String> keyColumns, boolean async) {
+    public <K> CompletableFuture<Map<K, SimpleStorageModel>> getStorageModelMap(List<String> keyColumns, boolean async, Class<K> keyClass) {
         return null;
     }
 

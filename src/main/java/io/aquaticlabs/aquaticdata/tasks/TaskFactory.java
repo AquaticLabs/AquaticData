@@ -145,7 +145,7 @@ public class TaskFactory {
      * Any scheduled tasks will be cancelled and any active tasks will be allowed to complete.
      */
     public void shutdown() {
-        DataDebugLog.logDebug("Shutting down Task Factory " + ownerID);
+        DataDebugLog.logDebug(DataDebugLogType.ALL_TASK_FACTORY, "Shutting down Task Factory " + ownerID);
 
         // Initiate shutdown
         isShuttingDown.set(true);
@@ -155,16 +155,16 @@ public class TaskFactory {
         try {
             // Wait for existing tasks to complete
             if (!scheduledExecutorService.awaitTermination(60, TimeUnit.SECONDS)) {
-                DataDebugLog.logDebug("Tasks did not terminate in the specified timeout. Forcing shutdown...");
+                DataDebugLog.logDebug(DataDebugLogType.TASK_SHUTDOWN, "Tasks did not terminate in the specified timeout. Forcing shutdown...");
                 List<Runnable> canceledTasks = scheduledExecutorService.shutdownNow();
-                DataDebugLog.logDebug(canceledTasks.size() + " tasks were forcefully stopped.");
+                DataDebugLog.logDebug(DataDebugLogType.TASK_SHUTDOWN, canceledTasks.size() + " tasks were forcefully stopped.");
             } else {
-                DataDebugLog.logDebug("Task Factory " + ownerID + " shut down gracefully.");
+                DataDebugLog.logDebug(DataDebugLogType.TASK_SHUTDOWN, "Task Factory " + ownerID + " shut down gracefully.");
             }
         } catch (InterruptedException e) {
-            DataDebugLog.logDebug("Shutdown interrupted. Forcing shutdown...");
+            DataDebugLog.logDebug(DataDebugLogType.TASK_SHUTDOWN, "Shutdown interrupted. Forcing shutdown...");
             List<Runnable> canceledTasks = scheduledExecutorService.shutdownNow();
-            DataDebugLog.logDebug(canceledTasks.size() + " tasks were forcefully stopped.");
+            DataDebugLog.logDebug(DataDebugLogType.TASK_SHUTDOWN, canceledTasks.size() + " tasks were forcefully stopped.");
             Thread.currentThread().interrupt();
         }
     }

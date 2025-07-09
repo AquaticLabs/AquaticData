@@ -119,7 +119,7 @@ public abstract class Database<T extends StorageModel> {
 
     public abstract CompletableFuture<List<T>> getKeyedList(String key, String keyValue, boolean async);
 
-    public abstract <K> CompletableFuture<Map<K, SimpleStorageModel>> getStorageModelMap(List<String> keyColumns, boolean async);
+    public abstract <K> CompletableFuture<Map<K, SimpleStorageModel>> getStorageModelMap(List<String> keyColumns, boolean async, Class<K> keyClass);
 
     public abstract CompletableFuture<List<SimpleStorageModel>> getSortedListByColumn(DatabaseStructure databaseStructure, String sortByColumnName, SQLDatabase.SortOrder sortOrder, int limit, int offset, boolean async);
 
