@@ -2,7 +2,6 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/modules/AquaticData.iml" filepath="$PROJECT_DIR$/.idea/modules/AquaticData.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/AquaticData.main.iml" filepath="$PROJECT_DIR$/.idea/modules/AquaticData.main.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/AquaticData.test.iml" filepath="$PROJECT_DIR$/.idea/modules/AquaticData.test.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/io.aquaticlabs.AquaticData.main.iml" filepath="$PROJECT_DIR$/.idea/modules/io.aquaticlabs.AquaticData.main.iml" />

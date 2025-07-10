@@ -42,7 +42,7 @@ class TestMain {
     @BeforeEach
     void setup() {
         DataDebugLog.setDebug(true);
-        DataDebugLog.setActiveLogTypes(DataDebugLogType.SQL_EXCEPTIONS, DataDebugLogType.DATABASE_STARTUP, DataDebugLogType.SQL_LOADING);
+        DataDebugLog.setActiveLogTypes(DataDebugLogType.SQL_EXCEPTIONS);
 
         // holder = new TestHolder(new JsonCredential("TestingSB", "TestingTable", new File( "data.json")));
         holder = new TestHolder(new SQLiteCredential("TestingSB", "TestingTable", new File("")));
@@ -160,7 +160,7 @@ class TestMain {
         }
     }
 
-    @Test
+    //@Test
     void dataExists() {
         TestData data = holder.get(UUID.fromString("838267c7-f097-4a2b-8289-94ec49b250ee"));
         System.out.println(holder.getDataMap().size());

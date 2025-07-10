@@ -68,7 +68,7 @@ public class DataDebugLog {
 
 
     public static void logDebug(DataDebugLogType logType, Object debugMessage) {
-        if (debug && activeLogTypes.contains(logType)) {
+        if (debug && DataDebugLogType.isDebug(activeLogTypes,logType)) {
             logger.log(Level.INFO, "Log Type: " + logType.name() + " : " + debugMessage);
         }
     }
