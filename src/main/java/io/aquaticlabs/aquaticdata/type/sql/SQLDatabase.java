@@ -66,10 +66,15 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
 
     protected boolean doesEntryExist(Connection connection, DataEntry<String, ?> key) {
         String sql = "SELECT 1 FROM " + credential.getTableName() + " WHERE " + key.getKey() + " = '" + key.getValue().toString() + "'";
+        DataDebugLog.logDebug(DataDebugLogType.SQL_QUERIES, sql);
+
         ResultSet resultSet = null;
         try {
             resultSet = connection.createStatement().executeQuery(sql);
-            return resultSet.next();
+            boolean exists = resultSet.next();
+            DataDebugLog.logDebug(DataDebugLogType.ALL_SQL, "Entry: " + key.getValue().toString() + " Exist: " + exists);
+
+            return exists;
         } catch (SQLException e) {
             throw new IllegalStateException("Error while checking if entry exists in database", e);
         } finally {
@@ -157,6 +162,9 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
 
                         DatabaseStructure modifiedStructure = data.toDatabaseStructure(getTableStructure());
                         boolean exists = existingEntries.containsKey(object.getKey());
+                        System.out.println(object.getKey());
+                        System.out.println(existingEntries.size());
+                        System.out.println(existingEntries.keySet());
 
                         DataDebugLog.logDebug(DataDebugLogType.SQL_SAVING, getDataClass().getSimpleName() + " Database: exists: " + exists);
 
@@ -245,85 +253,10 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
 
                         modified++;
                         DatabaseStructure modifiedStructure = data.toDatabaseStructure(getTableStructure());
-                        if (doesEntryExist(connection, modifiedStructure.getFirstValuePair())) {
+                        DataEntry<String, String> firstPair = modifiedStructure.getFirstValuePair();
+                        DataDebugLog.logDebug(DataDebugLogType.SQL_QUERIES, "Checking existence for key=" + firstPair.getKey() + ", value=" + firstPair.getValue());
 
-                            try {
-                                DataDebugLog.logDebug(DataDebugLogType.SQL_UPDATE, getDataClass().getSimpleName() + " Database: Adding Update Batch Statement");
-                                statement.addBatch(updateStatement(needsUpdate));
-                                saved.add(object);
-                            } catch (SQLException e) {
-                                DataDebugLog.logDebug(DataDebugLogType.SQL_SAVING, getDataClass().getSimpleName() + " Database: Failed adding batch Data: " + e.getMessage());
-                            }
-                        } else {
-                            try {
-                                DataDebugLog.logDebug(DataDebugLogType.SQL_INSERT, getDataClass().getSimpleName() + " Database: Adding Insert Batch Statement");
-                                statement.addBatch(insertStatement(modifiedStructure));
-                                saved.add(object);
-                            } catch (SQLException e) {
-                                DataDebugLog.logDebug(DataDebugLogType.SQL_INSERT, getDataClass().getSimpleName() + " Database: Fail Inserting Data: " + e.getMessage());
-                            }
-                        }
-
-
-                        if (modified % batchSize == 0) {
-                            try {
-                                statement.executeBatch();
-                                statement.clearBatch();
-
-                                DataDebugLog.logDebug(DataDebugLogType.SQL_SAVING, getDataClass().getSimpleName() + " Database: Success executing batch of " + modified);
-
-                            } catch (SQLException e) {
-                                DataDebugLog.logDebug(DataDebugLogType.SQL_SAVING, getDataClass().getSimpleName() + " Database: Failed executing batch: " + e.getMessage());
-                            }
-                        }
-                    }
-                    DataDebugLog.logDebug(DataDebugLogType.SQL_SAVING, getDataClass().getSimpleName() + " Database: Executing Last batch of " + modified);
-                    statement.executeBatch();
-
-                    connection.commit(); // Commit the transaction
-                } catch (SQLException e) {
-                    connection.rollback();
-                }
-                connection.setAutoCommit(true);
-
-                future.complete(saved);
-                DataDebugLog.logDebug(DataDebugLogType.SQL_SAVING, getDataClass().getSimpleName() + " Database: Saved List, Modified " + modified + " users.");
-                return true;
-            }
-        }, executor));
-        return future;
-    }
-
-   // @Override
-    public CompletableFuture<Boolean> saveListOfStorageModels(List<SimpleStorageModel> list, boolean async) {
-        Executor executor = getExecutor(async);
-        CompletableFuture<Boolean> future = new CompletableFuture<>();
-
-        getConnectionQueue().addConnectionRequest(new ConnectionRequest<>(connection -> {
-            int modified = 0;
-            List<T> saved = new ArrayList<>();
-            try (Statement statement = connection.createStatement()) {
-                connection.setAutoCommit(false);
-                try {
-                    for (SimpleStorageModel object : list) {
-
-                        DataDebugLog.logDebug(DataDebugLogType.SQL_SAVING, getDataClass().getSimpleName() + " Database: Saving List: " + object.getKey());
-
-     /*                   SerializedData data = new SerializedData();
-                        getSerializer().serialize(object, data);
-*/
-                        DatabaseStructure needsUpdate = buildNeedsUpdate(object, data);
-
-                        // If the size is 1, it should only contain the key.
-                        if (needsUpdate.getColumnStructure().size() == 1) {
-                            DataDebugLog.logDebug(DataDebugLogType.SQL_UPDATE, getDataClass().getSimpleName() + " Database: Needs update contains no data values. no need for updating");
-                            continue;
-                        }
-
-                        modified++;
-                        DatabaseStructure modifiedStructure = data.toDatabaseStructure(getTableStructure());
-                        if (doesEntryExist(connection, modifiedStructure.getFirstValuePair())) {
-
+                        if (doesEntryExist(connection, firstPair)) {
                             try {
                                 DataDebugLog.logDebug(DataDebugLogType.SQL_UPDATE, getDataClass().getSimpleName() + " Database: Adding Update Batch Statement");
                                 statement.addBatch(updateStatement(needsUpdate));
@@ -866,7 +799,10 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
         try (PreparedStatement checkStmt = connection.prepareStatement("SELECT " + keyColumn + " FROM " + credential.getTableName())) {
             ResultSet rs = checkStmt.executeQuery();
             while (rs.next()) {
-                existingEntries.put(StorageUtil.fromObject(rs.getObject(keyColumn), getKeyClass()), true);
+                Object object = StorageUtil.fromObject(rs.getObject(keyColumn), getKeyClass());
+                DataDebugLog.logDebug(DataDebugLogType.ALL_SQL, "caching existing entries: " + object.toString());
+
+                existingEntries.put(object, true);
             }
         }
         return existingEntries;
