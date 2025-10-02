@@ -6,7 +6,7 @@
 
     <groupId>io.aquaticlabs</groupId>
     <artifactId>AquaticData</artifactId>
-    <version>1.2</version>
+    <version>1.2.001</version>
 
     <properties>
         <maven.compiler.source>1.8</maven.compiler.source>
@@ -15,12 +15,6 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     </properties>
 
-    <distributionManagement>
-        <repository>
-            <id>AquaticData</id>
-            <url>https://reposilite.frostyfactions.com/releases</url>
-        </repository>
-    </distributionManagement>
 
     <build>
         <plugins>

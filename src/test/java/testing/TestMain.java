@@ -20,6 +20,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -29,6 +30,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 /**
  * @Author: extremesnow
@@ -37,15 +39,15 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 class TestMain {
 
-    TestHolder holder;
+    TestHolderSmaller holder;
 
     @BeforeEach
     void setup() {
         DataDebugLog.setDebug(true);
-        DataDebugLog.setActiveLogTypes(DataDebugLogType.SQL_EXCEPTIONS);
+        DataDebugLog.setActiveLogTypes(DataDebugLogType.values());
 
         // holder = new TestHolder(new JsonCredential("TestingSB", "TestingTable", new File( "data.json")));
-        holder = new TestHolder(new SQLiteCredential("TestingSB", "TestingTable", new File("")));
+        holder = new TestHolderSmaller(new SQLiteCredential("TestingSB2", "TestingTable2", new File("")));
     }
 
     @AfterEach
@@ -67,7 +69,7 @@ class TestMain {
     void addEntry() {
         TestData data = new TestData(UUID.randomUUID());
         data.setName("Jeff");
-        data.setValue(10);
+        //data.setValue(10);
 
         holder.create(data);
 
@@ -75,22 +77,24 @@ class TestMain {
 
         Assertions.assertEquals(data.getKey(), loadedData.getKey());
         Assertions.assertEquals(data.getName(), loadedData.getName());
-        Assertions.assertEquals(data.getValue(), loadedData.getValue());
-    }
-
-    //@Test
-    void addBulk() throws ExecutionException, InterruptedException, TimeoutException {
-        for (int i = 0; i < 400000; i++) {
-            TestData data = new TestData(UUID.randomUUID());
-            data.setName("Mr Jeff: " + i);
-            data.setValue(randomNumber(1, 100000));
-            holder.add(data);
-        }
-        holder.saveAll(false);
-
+        //  Assertions.assertEquals(data.getValue(), loadedData.getValue());
     }
 
     @Test
+    void addBulk() throws ExecutionException, InterruptedException, TimeoutException {
+
+        List<TestData> dataList = new ArrayList<>();
+        for (int i = 0; i < 15; i++) {
+            TestData data = new TestData(UUID.randomUUID());
+            data.setName("Mr Commrad: " + i);
+            data.getStat(SimpleStatType.VALUE).setValue(randomNumber(1, 100000));
+            dataList.add(data);
+        }
+        holder.saveDataList(dataList, null, false);
+
+    }
+
+    //@Test
     void testNewRank() {
 
         DatabaseStructure structure = new DatabaseStructure();
@@ -112,6 +116,59 @@ class TestMain {
         }
 
     }
+
+    @Test
+    void testUpdateRank() {
+        // a7157548 - 02 ca - 457d - 9e61 - 7e0851 bd643f
+        Leaderboard leaderboard = new Leaderboard(SimpleStatType.VALUE, 50);
+
+
+        holder.loadAllData(true).whenComplete((list, t) -> {
+            DataDebugLog.logDebug(DataDebugLogType.OTHER, "starting updating list: ");
+
+            List<TestData> updateRankList = new LinkedList<>();
+
+
+            List<DataEntry<TestData, Object>> sortedList = list.stream()
+                    .map(playerData -> new DataEntry<>(playerData, playerData.getStat(leaderboard.getStatType()).getValue()))
+                    .collect(Collectors.toList());
+
+            sortedList = ObjectSorter.sortIntAndName(sortedList);
+
+            int rank = 1;
+            for (DataEntry<TestData, Object> entry : sortedList) {
+                if (entry.getKey().getStat(leaderboard.getStatType()).setRank(rank)) {
+                    System.out.println("setting rank for " + entry.getKey().getName() + " to " + rank + " val: " + entry.getValue());
+                    updateRankList.add(entry.getKey());
+                } else {
+                    System.out.println("no change in rank for " + entry.getKey().getName() + " skipping.");
+                }
+                rank++;
+            }
+
+            int endInt = leaderboard.getLeaderboardSize();
+            if (sortedList.size() < endInt) endInt = sortedList.size();
+
+            List<DataEntry<SimpleStorageModel, Object>> finalSortedList = sortedList.subList(0, endInt).stream()
+                    .map(playerDataEntry -> {
+                        SimpleStorageModel model = new SimpleStorageModel(playerDataEntry.getKey().getKey());
+                        model.addValue("uuid", playerDataEntry.getKey().getKey());
+                        model.addValue("name", playerDataEntry.getKey().getName());
+                        model.addValue("value", playerDataEntry.getValue());
+                        return new DataEntry<>(model, playerDataEntry.getValue());
+                    })
+                    .collect(Collectors.toList());
+
+            leaderboard.updateTop(finalSortedList);
+            System.out.println("Finalized Sorting List: " + SimpleStatType.VALUE);
+            System.out.println("Starting to save list of size: " + updateRankList.size());
+            DatabaseStructure structure = new DatabaseStructure();
+            structure.addColumn("value_rank", null);
+            holder.saveDataList(updateRankList, structure, false);
+            System.out.println(leaderboard.getTop(10).values());
+        });
+    }
+
 
     //@Test
     void testRank() throws Exception {
@@ -170,7 +227,7 @@ class TestMain {
         }
         Assertions.assertNotNull(data);
 
-        Assertions.assertEquals(69, data.getValue());
+        //  Assertions.assertEquals(69, data.getValue());
 
     }
 

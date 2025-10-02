@@ -37,14 +37,16 @@ public class MutableSingle<T> {
         return result;
     }
 
-    public void set(T newValue) {
+    public boolean set(T newValue) {
         if (!newValue.equals(previousValue)) {
             value = newValue;
             previousValue = newValue;
             for (Consumer<T> listener : listeners) {
                 listener.accept(newValue);
             }
+            return true;
         }
+        return false;
     }
 
     public void onChanged(Consumer<T> listener) {

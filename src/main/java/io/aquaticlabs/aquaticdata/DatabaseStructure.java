@@ -18,6 +18,7 @@ import java.util.Map;
 @Getter
 public class DatabaseStructure {
 
+    @Setter
     private String keyName;
     private final Map<String, ColumnData<?>> columnStructure = new LinkedHashMap<>();
 
@@ -47,9 +48,8 @@ public class DatabaseStructure {
         return this;
     }
 
-    public DataEntry<String, String> getFirstValuePair() {
-        Map.Entry<String, ColumnData<?>> entry = columnStructure.entrySet().iterator().next();
-        return new DataEntry<>(entry.getKey(), entry.getValue().getValue().toString());
+    public DataEntry<String, String> getKeyValuePair() {
+        ColumnData<?> entry = columnStructure.get(keyName);
+        return new DataEntry<>(keyName, entry.getValue().toString());
     }
-
 }

@@ -65,6 +65,7 @@ public class SerializedData {
     public DatabaseStructure toDatabaseStructure(DatabaseStructure tableStructure) {
         DatabaseStructure structure = new DatabaseStructure();
         structure.setTableName(tableStructure.getTableName());
+        structure.setKeyName(tableStructure.getKeyName());
         for (Map.Entry<String, ColumnData<?>> entry : tableStructure.getColumnStructure().entrySet()) {
             String key = entry.getKey();
             String value = applyAs(key, String.class, () -> entry.getValue().getDefaultValue() + "");

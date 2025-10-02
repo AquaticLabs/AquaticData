@@ -122,6 +122,11 @@ public class JsonDatabase<T extends StorageModel> extends Database<T> {
         return saveLoaded(list, async);
     }
 
+    @Override
+    public CompletableFuture<List<T>> saveList(List<T> list, DatabaseStructure updateStructure, boolean async) {
+        return saveList(list,async);
+    }
+
     private void saveInternal(T object) {
         SerializedData serializedData = new SerializedData();
         getSerializer().serialize(object, serializedData);

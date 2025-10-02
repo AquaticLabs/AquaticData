@@ -122,8 +122,8 @@ public abstract class StorageHolder<K, T extends StorageModel> extends Storage<K
         return database.save(object, async);
     }
 
-    protected CompletableFuture<List<T>> saveList(List<T> objects, boolean async) {
-        return database.saveList(objects, async);
+    protected CompletableFuture<List<T>> saveList(List<T> objects, DatabaseStructure updateColumns, boolean async) {
+        return database.saveList(objects,updateColumns, async);
     }
 
     protected CompletableFuture<T> load(DataEntry<String, K> key, boolean async) {

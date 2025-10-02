@@ -162,9 +162,11 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
 
                         DatabaseStructure modifiedStructure = data.toDatabaseStructure(getTableStructure());
                         boolean exists = existingEntries.containsKey(object.getKey());
+/*
                         System.out.println(object.getKey());
                         System.out.println(existingEntries.size());
                         System.out.println(existingEntries.keySet());
+*/
 
                         DataDebugLog.logDebug(DataDebugLogType.SQL_SAVING, getDataClass().getSimpleName() + " Database: exists: " + exists);
 
@@ -227,6 +229,21 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
      */
     @Override
     public CompletableFuture<List<T>> saveList(List<T> list, boolean async) {
+        return saveList(list, null, async);
+    }
+
+    /**
+     * Saves or updates a list of objects in the database using batch processing.
+     * If an object already exists (based on its key), it is updated; otherwise, a new entry is inserted.
+     * Batch execution is used for efficiency, and transactions are committed after processing.
+     *
+     * @param list            The list of objects to be saved or updated.
+     * @param updateStructure The structure of which should be updated.
+     * @param async           Whether to execute the operation asynchronously.
+     * @return A {@link CompletableFuture} containing the list of successfully saved objects.
+     */
+    @Override
+    public CompletableFuture<List<T>> saveList(List<T> list, DatabaseStructure updateStructure, boolean async) {
         Executor executor = getExecutor(async);
         CompletableFuture<List<T>> future = new CompletableFuture<>();
 
@@ -243,7 +260,8 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
                         SerializedData data = new SerializedData();
                         getSerializer().serialize(object, data);
 
-                        DatabaseStructure needsUpdate = buildNeedsUpdate(object, data);
+
+                        DatabaseStructure needsUpdate = buildNeedsUpdateFromStruct(object, updateStructure, data);
 
                         // If the size is 1, it should only contain the key.
                         if (needsUpdate.getColumnStructure().size() == 1) {
@@ -253,10 +271,10 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
 
                         modified++;
                         DatabaseStructure modifiedStructure = data.toDatabaseStructure(getTableStructure());
-                        DataEntry<String, String> firstPair = modifiedStructure.getFirstValuePair();
-                        DataDebugLog.logDebug(DataDebugLogType.SQL_QUERIES, "Checking existence for key=" + firstPair.getKey() + ", value=" + firstPair.getValue());
+                        DataEntry<String, String> keyPair = modifiedStructure.getKeyValuePair();
+                        DataDebugLog.logDebug(DataDebugLogType.SQL_QUERIES, "Checking existence for key=" + keyPair.getKey() + ", value=" + keyPair.getValue());
 
-                        if (doesEntryExist(connection, firstPair)) {
+                        if (doesEntryExist(connection, keyPair)) {
                             try {
                                 DataDebugLog.logDebug(DataDebugLogType.SQL_UPDATE, getDataClass().getSimpleName() + " Database: Adding Update Batch Statement");
                                 statement.addBatch(updateStatement(needsUpdate));
@@ -331,7 +349,7 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
         getConnectionQueue().addConnectionRequest(new ConnectionRequest<>(connection -> {
             DatabaseStructure modifiedStructure = data.toDatabaseStructure(getTableStructure());
 
-            if (doesEntryExist(connection, modifiedStructure.getFirstValuePair())) {
+            if (doesEntryExist(connection, modifiedStructure.getKeyValuePair())) {
                 try {
                     connection.createStatement().executeUpdate(updateStatement(needsUpdate));
                     DataDebugLog.logDebug(DataDebugLogType.SQL_UPDATE, getDataClass().getSimpleName() + " Database: Success Updating Data");
@@ -667,6 +685,40 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
         ASC, DESC
     }
 
+/*    private DatabaseStructure buildNeedsUpdate(T object, DatabaseStructure structure, SerializedData data) {
+
+
+    }
+    */
+
+
+    private DatabaseStructure buildNeedsUpdateFromStruct(T object, DatabaseStructure startingStruct, SerializedData data) {
+
+        if (startingStruct == null) {
+            return buildNeedsUpdate(object, data);
+        }
+        ModelCachedData cachedData = getDataCache().computeIfAbsent(object.getKey().toString(), key -> new ModelCachedData());
+        DatabaseStructure needsUpdate = new DatabaseStructure();
+        needsUpdate.setTableName(credential.getTableName());
+        DatabaseStructure dataStruct = data.toDatabaseStructure(getTableStructure());
+        Map<String, ColumnData<?>> entries = dataStruct.getColumnStructure ();
+        needsUpdate.addValue(dataStruct.getKeyName(), (SQLColumnData<?>) entries.get(dataStruct.getKeyName()));
+
+        for (String key : startingStruct.getColumnStructure().keySet()) {
+            SQLColumnData<?> columnData = (SQLColumnData<?>) entries.get(key);
+
+            if (!columnData.isCompareCache()) {
+                continue;
+            }
+            if (data.getValue(key).isEmpty() || cachedData.isOutdated(key, columnData.getValueOrDefault().toString())) {
+                needsUpdate.addValue(key, columnData);
+                DataDebugLog.logDebug(DataDebugLogType.SQL_UPDATE, getDataClass().getSimpleName() + " Database: Needs Update: " + key + " " + columnData.getValueOrDefault());
+            }
+        }
+        return needsUpdate;
+
+    }
+
     private DatabaseStructure buildNeedsUpdate(T object, SerializedData data) {
         ModelCachedData cachedData = getDataCache().computeIfAbsent(object.getKey().toString(), key -> new ModelCachedData());
 
@@ -684,7 +736,9 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
                 first = false;
                 continue;
             }
-            if (!columnData.isCompareCache()) continue;
+            if (!columnData.isCompareCache()) {
+                continue;
+            }
             if (data.getValue(entry.getKey()).isEmpty() || cachedData.isOutdated(column, columnData.getValueOrDefault().toString())) {
                 needsUpdate.addValue(column, columnData);
                 DataDebugLog.logDebug(DataDebugLogType.SQL_UPDATE, getDataClass().getSimpleName() + " Database: Needs Update: " + column + " " + columnData.getValueOrDefault());

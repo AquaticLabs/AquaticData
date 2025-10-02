@@ -117,6 +117,8 @@ public abstract class Database<T extends StorageModel> {
 
     public abstract CompletableFuture<List<T>> saveList(List<T> list, boolean async);
 
+    public abstract CompletableFuture<List<T>> saveList(List<T> list, DatabaseStructure updateStructure, boolean async);
+
     public abstract CompletableFuture<List<T>> getKeyedList(String key, String keyValue, boolean async);
 
     public abstract <K> CompletableFuture<Map<K, SimpleStorageModel>> getStorageModelMap(List<String> keyColumns, boolean async, Class<K> keyClass);

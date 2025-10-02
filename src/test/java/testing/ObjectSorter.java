@@ -3,11 +3,14 @@ package testing;
 import io.aquaticlabs.aquaticdata.model.SimpleStorageModel;
 import io.aquaticlabs.aquaticdata.util.DataEntry;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * @Author: extremesnow
@@ -53,6 +56,18 @@ public class ObjectSorter {
                 .forEachOrdered(x -> sortedItems.put(x.getKey(), x.getValue()));
 
         return sortedItems;
+    }
+
+    public static List<DataEntry<TestData, Object>> sortIntAndName(List<DataEntry<TestData, Object>> items) {
+        List<DataEntry<TestData, Object>> convertedItems = new ArrayList<>(items);
+        Comparator<DataEntry<TestData, Object>> entryComparator = Comparator
+                .comparingInt((DataEntry<TestData, Object> o) -> ((Integer) o.getValue()))
+                .reversed()
+                .thenComparing((DataEntry<TestData, Object> o) -> o.getKey().getName(), String.CASE_INSENSITIVE_ORDER);
+
+        return convertedItems.stream()
+                .sorted(entryComparator)
+                .collect(Collectors.toList());
     }
 
     public static Map<UUID, DataEntry<SimpleStorageModel, Object>> sortDouble(Map<UUID, DataEntry<SimpleStorageModel, Object>>items) {

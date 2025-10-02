@@ -90,6 +90,7 @@ public class DataDebugLog {
         logger.log(Level.WARNING, "Database Error: " + debug);
         if (e != null) {
             logger.log(Level.SEVERE, e.getMessage(), e);
+            e.printStackTrace();
         }
     }
 

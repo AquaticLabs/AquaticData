@@ -14,11 +14,9 @@ import io.aquaticlabs.aquaticdata.util.DataEntry;
 import io.aquaticlabs.aquaticdata.util.MutableSingle;
 import lombok.Getter;
 
-
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -35,14 +33,14 @@ import java.util.concurrent.atomic.AtomicInteger;
  * On: 11/3/2024
  * At: 23:55
  */
-public class TestHolder extends StorageHolder<UUID, TestData> {
+public class TestHolderSmaller extends StorageHolder<UUID, TestData> {
 
     @Getter
     private Map<UUID, TestData> dataMap = new ConcurrentHashMap<>();
     private DataCredential credential;
 
-    public TestHolder(DataCredential credential) {
-        super(credential, UUID.class, TestData.class, StorageMode.LOAD_AND_TIMEOUT, CompletableFuture::runAsync, Runnable::run);
+    public TestHolderSmaller(DataCredential credential) {
+        super(credential, UUID.class, TestData.class, StorageMode.LOAD_AND_REMOVE, CompletableFuture::runAsync, Runnable::run);
         this.credential = credential;
         setCacheSaveTime(60L * 10);
         setCacheSaveMode(CacheSaveMode.TIME);
@@ -66,8 +64,8 @@ public class TestHolder extends StorageHolder<UUID, TestData> {
         save(data, true);
         return data;
     }
-    public void saveDataList(List<TestData> playerDataList, DatabaseStructure structure, boolean async) {
-        saveList(playerDataList, structure, async);
+    public void saveDataList(List<TestData> playerDataList, DatabaseStructure updateColumns, boolean async) {
+        saveList(playerDataList,updateColumns, async);
     }
 
     public TestData getOrCreate(UUID uuid) {
@@ -125,7 +123,7 @@ public class TestHolder extends StorageHolder<UUID, TestData> {
         structure.addColumn("name", new SQLColumnData<>(String.class));
         structure.addColumn("value", new SQLColumnData<>(0));
         structure.addColumn("value2", new SQLColumnData<>(0));
-        structure.addColumn("value_rank", new SQLColumnData<>(0).compareCache(false));
+        structure.addColumn("value_rank", new SQLColumnData<>(0));
 
         return structure;
     }
@@ -150,8 +148,9 @@ public class TestHolder extends StorageHolder<UUID, TestData> {
         return new ModelSerializer<TestData>().serializer((model, data) -> {
             data.write("uuid", model.getKey());
             data.write("name", model.getName());
-            data.write("value", model.getStat(SimpleStatType.VALUE).getValue());
+            data.write("value", model.getStatMap().get(SimpleStatType.VALUE).getValue());
             data.write("value2", model.getValue2());
+            data.write("value_rank", model.getStatMap().get(SimpleStatType.VALUE).getRank().get());
         }).deserializer((model, data) -> {
             if (model == null) {
                 model = new TestData();
@@ -160,7 +159,7 @@ public class TestHolder extends StorageHolder<UUID, TestData> {
             model.setName(data.applyAs("name", String.class));
             model.getStat(SimpleStatType.VALUE).setValue(data.applyAs("value", Integer.class));
             model.setValue2(data.applyAs("value2", Integer.class, () -> 5));
-            model.getStat(SimpleStatType.VALUE).setRank(data.applyAs("value_rank",Integer.class));
+            model.getStat(SimpleStatType.VALUE).getRank().set(data.applyAs("value_rank",Integer.class));
 
             return model;
         });
