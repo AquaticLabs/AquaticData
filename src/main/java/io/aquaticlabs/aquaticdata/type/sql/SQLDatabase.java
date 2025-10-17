@@ -511,7 +511,6 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
         Executor executor = getExecutor(async);
         CompletableFuture<List<T>> future = new CompletableFuture<>();
         executeRequest(new ConnectionRequest<>(conn -> {
-            List<T> loaded = new ArrayList<>();
             try (Statement stmt = conn.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY)) {
                 ResultSet rs = stmt.executeQuery("SELECT * FROM " + credential.getTableName() + " WHERE " + keyColumn + " = '" + keyValue + "' ;");
 
@@ -532,22 +531,26 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
                     rowData.add(data);
                 }
 
-                rowData.parallelStream().forEach(data -> {
+                    List<T> loaded = rowData.parallelStream().map(data -> {
                     SerializedData serializedData = new SerializedData();
                     serializedData.fromQuery(data);
                     try {
                         T entry = getSerializer().deserialize(construct(getDataClass()), serializedData);
                         loadIntoCache(entry, serializedData);
-                        loaded.add(entry);
+                        return entry;
+
                     } catch (Exception exception) {
                         DataDebugLog.logDebug(DataDebugLogType.SQL_LOADING, getDataClass().getSimpleName() + " Database: Failed to deserialize class, with data: " + serializedData);
                         DataDebugLog.logError(exception.getMessage());
+                        return null;
                     }
-                });
+                }).filter(Objects::nonNull).collect(Collectors.toList());
+
+                future.complete(loaded);
+
             } catch (SQLException e) {
                 DataDebugLog.logError("Failed to get KEY users: " + e.getMessage());
             }
-            future.complete(loaded);
             return null;
         }, executor));
         return future;
