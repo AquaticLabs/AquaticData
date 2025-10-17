@@ -29,6 +29,7 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
+import java.util.stream.Collectors;
 
 /**
  * @Author: extremesnow
@@ -441,7 +442,6 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
         Executor executor = getExecutor(async);
         CompletableFuture<List<T>> future = new CompletableFuture<>();
         executeRequest(new ConnectionRequest<>(conn -> {
-            List<T> loaded = new ArrayList<>();
             try (Statement stmt = conn.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY)) {
 
                 if (!sqliteCredential) {
@@ -469,24 +469,27 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
                 }
 
                 // Parallelize deserialization and loading into cache
-                rowData.parallelStream().forEach(data -> {
+                List<T> loaded = rowData.parallelStream().map(data -> {
                     SerializedData serializedData = new SerializedData();
                     serializedData.fromQuery(data);
                     try {
                         T dummy = getSerializer().deserialize(holder.get(serializedData.applyAs(data.get(0).getField(), holder.getKeyClass(), null)), serializedData);
                         loadIntoCache(dummy, serializedData);
                         holder.add(dummy);
-                        loaded.add(dummy);
+                        return dummy;
 
                     } catch (Exception exception) {
                         DataDebugLog.logDebug(DataDebugLogType.SQL_LOADING, getDataClass().getSimpleName() + " Database: Failed to deserialize class, with data: " + serializedData);
                         DataDebugLog.logError(exception.getMessage());
+                        return null;
                     }
-                });
+                }).filter(Objects::nonNull).collect(Collectors.toList());
+
+                future.complete(loaded);
             } catch (SQLException e) {
                 DataDebugLog.logError("Failed to load all users: " + e.getMessage());
             }
-            future.complete(loaded);
+
             return null;
         }, executor));
         return future;
@@ -710,7 +713,7 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
             if (!columnData.isCompareCache()) {
                 continue;
             }
-            if (data.getValue(key).isEmpty() || cachedData.isOutdated(key, columnData.getValueOrDefault().toString())) {
+            if (!data.getValue(key).isPresent() || cachedData.isOutdated(key, columnData.getValueOrDefault().toString())) {
                 needsUpdate.addValue(key, columnData);
                 DataDebugLog.logDebug(DataDebugLogType.SQL_UPDATE, getDataClass().getSimpleName() + " Database: Needs Update: " + key + " " + columnData.getValueOrDefault());
             }
@@ -739,7 +742,7 @@ public abstract class SQLDatabase<T extends StorageModel> extends HikariCPDataba
             if (!columnData.isCompareCache()) {
                 continue;
             }
-            if (data.getValue(entry.getKey()).isEmpty() || cachedData.isOutdated(column, columnData.getValueOrDefault().toString())) {
+            if (!data.getValue(entry.getKey()).isPresent() || cachedData.isOutdated(column, columnData.getValueOrDefault().toString())) {
                 needsUpdate.addValue(column, columnData);
                 DataDebugLog.logDebug(DataDebugLogType.SQL_UPDATE, getDataClass().getSimpleName() + " Database: Needs Update: " + column + " " + columnData.getValueOrDefault());
             }
